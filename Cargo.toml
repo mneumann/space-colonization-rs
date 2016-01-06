@@ -12,3 +12,4 @@ rand = "0.3"
 num = "0.1"
 nalgebra = "0.4.0"
 kiss3d = {git = "https://github.com/Ticki/kiss3d.git"}
+clap = "1.5.5"

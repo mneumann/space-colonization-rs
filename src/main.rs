@@ -2,11 +2,14 @@ extern crate nalgebra as na;
 extern crate kiss3d;
 extern crate rand;
 extern crate num;
+extern crate clap;
 
 use kiss3d::window::Window;
 use na::{Pnt2, Pnt3, Vec2, Vec3, Norm, FloatPnt, FloatVec};
 use rand::{Rng, Closed01};
 use num::Zero;
+use clap::{Arg, App};
+use std::str::FromStr;
 
 struct SpaceColonization<T, F>
     where T: FloatPnt<f32, F>,
@@ -148,8 +151,6 @@ impl<T, F> SpaceColonization<T, F>
     }
 }
 
-const Z_OFF: f32 = 0.0;
-
 fn random_closed01<R: Rng>(rng: &mut R) -> f32 {
     rng.gen::<Closed01<f32>>().0
 }
@@ -169,9 +170,7 @@ impl MyPoint for Pnt3<f32> {
     }
 
     fn random<R: Rng>(rng: &mut R) -> Pnt3<f32> {
-        Pnt3::new(random_coord(rng),
-                  random_coord(rng),
-                  random_coord(rng) + Z_OFF)
+        Pnt3::new(random_coord(rng), random_coord(rng), random_coord(rng))
     }
 }
 
@@ -185,13 +184,92 @@ impl MyPoint for Pnt2<f32> {
     }
 }
 
+#[derive(Debug)]
 struct Config {
     n_attraction_points: usize,
     n_roots: usize,
     influence_radius: f32,
     move_distance: f32,
     kill_distance: f32,
+    use_3d: bool,
+    max_iter: Option<usize>,
 }
+
+impl Config {
+    fn config1() -> Config {
+        Config {
+            n_attraction_points: 10_000,
+            n_roots: 5,
+            influence_radius: 0.44,
+            kill_distance: 0.22,
+            move_distance: 0.02,
+            use_3d: true,
+            max_iter: None,
+        }
+    }
+
+    fn config2() -> Config {
+        Config {
+            n_attraction_points: 10_000,
+            n_roots: 5,
+            influence_radius: 0.1,
+            kill_distance: 0.07,
+            move_distance: 0.01,
+            use_3d: false,
+            max_iter: None,
+        }
+    }
+
+    fn from_cmd() -> Config {
+        let matches = App::new("space-colonization")
+                          .arg(Arg::with_name("NUM_POINTS")
+                                   .long("num-points")
+                                   .help("Number of attraction points (default: 1000)")
+                                   .takes_value(true)
+                                   .required(false))
+                          .arg(Arg::with_name("NUM_ROOTS")
+                                   .long("num-roots")
+                                   .help("Number of root nodes (default: 1)")
+                                   .takes_value(true)
+                                   .required(false))
+                          .arg(Arg::with_name("IR")
+                                   .long("radius")
+                                   .help("Influence radius (default: 0.25)")
+                                   .takes_value(true)
+                                   .required(false))
+                          .arg(Arg::with_name("KD")
+                                   .long("kill-distance")
+                                   .help("Kill distance (default: 0.1)")
+                                   .takes_value(true)
+                                   .required(false))
+                          .arg(Arg::with_name("MD")
+                                   .long("move-distance")
+                                   .help("Kill distance (default: 0.05)")
+                                   .takes_value(true)
+                                   .required(false))
+                          .arg(Arg::with_name("MAX_ITER")
+                                   .long("max-iter")
+                                   .help("Maximum iterations (default: infinite)")
+                                   .takes_value(true)
+                                   .required(false))
+                          .arg(Arg::with_name("USE_3D")
+                                   .long("use-3d")
+                                   .help("Use 3d mode"))
+                          .get_matches();
+
+        Config {
+            n_attraction_points: usize::from_str(matches.value_of("NUM_POINTS").unwrap_or("1000"))
+                                     .unwrap(),
+            n_roots: usize::from_str(matches.value_of("NUM_ROOTS").unwrap_or("1")).unwrap(),
+            influence_radius: f32::from_str(matches.value_of("IR").unwrap_or("0.25")).unwrap(),
+            kill_distance: f32::from_str(matches.value_of("KD").unwrap_or("0.1")).unwrap(),
+            move_distance: f32::from_str(matches.value_of("MD").unwrap_or("0.05")).unwrap(),
+            use_3d: matches.is_present("USE_3D"),
+            max_iter: usize::from_str(matches.value_of("MAX_ITER").unwrap_or("INVALID")).ok(),
+        }
+    }
+}
+
 
 fn run<T, F>(config: &Config)
     where T: MyPoint + FloatPnt<f32, F>,
@@ -220,6 +298,13 @@ fn run<T, F>(config: &Config)
 
     while window.render() {
         i += 1;
+
+        if let Some(m) = config.max_iter {
+            if i > m {
+                break;
+            }
+        }
+
         println!("Iteration: {}", i);
         for &(pt, status) in &attraction_points {
             if status {
@@ -235,22 +320,19 @@ fn run<T, F>(config: &Config)
                    config.influence_radius * config.influence_radius,
                    config.move_distance,
                    config.kill_distance * config.kill_distance);
+
     }
 }
 
-fn main() {
-    let use_2d = false;
-    let config = Config {
-        n_attraction_points: 10_000,
-        n_roots: 5,
-        influence_radius: 0.44, // 0.1
-        kill_distance: 0.22, // 0.07
-        move_distance: 0.02, // 0.01
-    };
 
-    if use_2d {
-        run::<Pnt2<f32>, Vec2<f32>>(&config);
-    } else {
+fn main() {
+    let config = Config::from_cmd();
+
+    println!("{:?}", config);
+
+    if config.use_3d {
         run::<Pnt3<f32>, Vec3<f32>>(&config);
+    } else {
+        run::<Pnt2<f32>, Vec2<f32>>(&config);
     }
 }

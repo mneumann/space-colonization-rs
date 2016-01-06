@@ -4,7 +4,7 @@ extern crate rand;
 extern crate num;
 
 use kiss3d::window::Window;
-use na::{Pnt2, Pnt3, Norm, FloatPnt, FloatVec};
+use na::{Pnt2, Pnt3, Vec2, Vec3, Norm, FloatPnt, FloatVec};
 use rand::{Rng, Closed01};
 use num::Zero;
 
@@ -148,32 +148,70 @@ impl<T, F> SpaceColonization<T, F>
     }
 }
 
+const Z_OFF: f32 = 0.0;
+
+fn random_closed01<R: Rng>(rng: &mut R) -> f32 {
+    rng.gen::<Closed01<f32>>().0
+}
+
 fn random_coord<R: Rng>(rng: &mut R) -> f32 {
-    2.0 * rng.gen::<Closed01<f32>>().0 - 1.0
+    2.0 * random_closed01(rng) - 1.0
 }
 
-fn random_point<R: Rng>(rng: &mut R) -> Pnt2<f32> {
-    Pnt2::new(random_coord(rng), random_coord(rng))
+trait MyPoint {
+    fn into_pnt3(self) -> Pnt3<f32>;
+    fn random<R: Rng>(rng: &mut R) -> Self;
 }
 
-const Z: f32 = 3.0;
+impl MyPoint for Pnt3<f32> {
+    fn into_pnt3(self) -> Pnt3<f32> {
+        self
+    }
 
-fn main() {
+    fn random<R: Rng>(rng: &mut R) -> Pnt3<f32> {
+        Pnt3::new(random_coord(rng),
+                  random_coord(rng),
+                  random_coord(rng) + Z_OFF)
+    }
+}
+
+impl MyPoint for Pnt2<f32> {
+    fn into_pnt3(self) -> Pnt3<f32> {
+        Pnt3::new(self.x, self.y, 3.0)
+    }
+
+    fn random<R: Rng>(rng: &mut R) -> Pnt2<f32> {
+        Pnt2::new(random_coord(rng), random_coord(rng))
+    }
+}
+
+struct Config {
+    n_attraction_points: usize,
+    n_roots: usize,
+    influence_radius: f32,
+    move_distance: f32,
+    kill_distance: f32,
+}
+
+fn run<T, F>(config: &Config)
+    where T: MyPoint + FloatPnt<f32, F>,
+          F: FloatVec<f32> + Zero + Copy
+{
     let mut rng = rand::thread_rng();
-
-    let n_attraction_points = 5000;
 
     // generate initial attraction point configuration
     // stores status of attraction point in the second tuple element (true=active, false=used)
-    let mut attraction_points: Vec<_> = (0..n_attraction_points)
-                                            .into_iter()
-                                            .map(|_| (random_point(&mut rng), true))
-                                            .collect();
+    let mut attraction_points: Vec<(T, bool)> = (0..config.n_attraction_points)
+                                                    .into_iter()
+                                                    .map(|_| {
+                                                        (<T as MyPoint>::random(&mut rng), true)
+                                                    })
+                                                    .collect();
 
-    let mut sc = SpaceColonization::new();
-    sc.add_root_node(random_point(&mut rng));
-    sc.add_root_node(random_point(&mut rng));
-    sc.add_root_node(random_point(&mut rng));
+    let mut sc: SpaceColonization<T, F> = SpaceColonization::new();
+    for _ in 0..config.n_roots {
+        sc.add_root_node(<T as MyPoint>::random(&mut rng));
+    }
 
     let mut window = Window::new("Space Colonization");
     let white = Pnt3::new(1.0, 1.0, 1.0);
@@ -183,16 +221,36 @@ fn main() {
     while window.render() {
         i += 1;
         println!("Iteration: {}", i);
-        for &(ref pt, status) in &attraction_points {
+        for &(pt, status) in &attraction_points {
             if status {
-                window.draw_point(&Pnt3::new(pt.x, pt.y, Z), &white);
+                window.draw_point(&pt.into_pnt3(), &white);
             }
         }
 
-        sc.iter_segments(&mut |a, b| {
-            window.draw_line(&Pnt3::new(a.x, a.y, Z), &Pnt3::new(b.x, b.y, Z), &white);
+        sc.iter_segments(&mut |&a, &b| {
+            window.draw_line(&a.into_pnt3(), &b.into_pnt3(), &white);
         });
 
-        sc.iterate(&mut attraction_points, 0.1 * 0.1, 0.01, 0.005);
+        sc.iterate(&mut attraction_points,
+                   config.influence_radius * config.influence_radius,
+                   config.move_distance,
+                   config.kill_distance * config.kill_distance);
+    }
+}
+
+fn main() {
+    let use_2d = false;
+    let config = Config {
+        n_attraction_points: 10_000,
+        n_roots: 5,
+        influence_radius: 0.44, // 0.1
+        kill_distance: 0.22, // 0.07
+        move_distance: 0.02, // 0.01
+    };
+
+    if use_2d {
+        run::<Pnt2<f32>, Vec2<f32>>(&config);
+    } else {
+        run::<Pnt3<f32>, Vec3<f32>>(&config);
     }
 }

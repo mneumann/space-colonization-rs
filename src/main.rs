@@ -124,15 +124,15 @@ impl<T, F> SpaceColonization<T, F>
             let nearest_leaf_opt = self.find_nearest_leaf_for_attraction_point(&ap.0,
                                                                                radius_influce_sq);
             if let Some((nearest_leaf_slot, d_sq)) = nearest_leaf_opt {
-                let nearest_leaf_node_idx = self.leaf_node_pointers[nearest_leaf_slot];
-                // update the force with the normalized vector towards the attraction point
-                let v = (ap.0 - self.node_positions[nearest_leaf_node_idx]).normalize();
-                self.leaf_node_grow_directions[nearest_leaf_slot] =
-                    self.leaf_node_grow_directions[nearest_leaf_slot] + v;
-
                 if d_sq < kill_distance_sq {
                     // set inactive
                     ap.1 = false;
+                } else {
+                    let nearest_leaf_node_idx = self.leaf_node_pointers[nearest_leaf_slot];
+                    // update the force with the normalized vector towards the attraction point
+                    let v = (ap.0 - self.node_positions[nearest_leaf_node_idx]).normalize();
+                    self.leaf_node_grow_directions[nearest_leaf_slot] =
+                        self.leaf_node_grow_directions[nearest_leaf_slot] + v;
                 }
             }
         }

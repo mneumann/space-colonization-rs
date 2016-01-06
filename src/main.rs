@@ -293,6 +293,7 @@ fn run<T, F>(config: &Config)
 
     let mut window = Window::new("Space Colonization");
     let white = Pnt3::new(1.0, 1.0, 1.0);
+    let red = Pnt3::new(1.0, 0.0, 0.0);
 
     let mut i = 0;
 
@@ -313,7 +314,7 @@ fn run<T, F>(config: &Config)
         }
 
         sc.iter_segments(&mut |&a, &b| {
-            window.draw_line(&a.into_pnt3(), &b.into_pnt3(), &white);
+            window.draw_line(&a.into_pnt3(), &b.into_pnt3(), &red);
         });
 
         sc.iterate(&mut attraction_points,

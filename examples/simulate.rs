@@ -4,6 +4,7 @@ extern crate kiss3d;
 extern crate rand;
 extern crate num;
 extern crate clap;
+extern crate eps_writer;
 
 use kiss3d::window::Window;
 use na::{Pnt2, Pnt3, Vec2, Vec3, FloatPnt, FloatVec};
@@ -12,6 +13,8 @@ use num::Zero;
 use clap::{Arg, App};
 use std::str::FromStr;
 use space_colonization::SpaceColonization;
+use eps_writer::*;
+use std::fs::File;
 
 fn random_closed01<R: Rng>(rng: &mut R) -> f32 {
     rng.gen::<Closed01<f32>>().0
@@ -166,6 +169,28 @@ fn run<T, F>(config: &Config)
     let mut i = 0;
 
     while window.render() {
+        if let Some(n) = config.save_every {
+            // save current iteration as eps
+            if i % n == 0 {
+                let filename = format!("out_{}.eps", i);
+                let mut document = EpsDocument::new();
+
+                for &pt in sc.attractors() {
+                     let pnt = pt.into_pnt3();
+                     document.add_shape(Box::new(Point(Position::new(pnt.x, pnt.y), 0.01)));
+                }
+
+                sc.iter_segments(&mut |&a, &b| {
+                    let pt1 = a.into_pnt3();
+                    let pt2 = b.into_pnt3();
+                    document.add_shape(Box::new(Line(Position::new(pt1.x, pt1.y), Position::new(pt2.x, pt2.y))));
+                });
+
+                let mut file = File::create(filename).unwrap();
+                document.write_eps(&mut file, 1.0, 1.0).unwrap();
+            }
+        }
+
         if let Some(n) = config.save_every {
             // save previous iteration of window.render()
             if i > 0 && (i - 1) % n == 0 {

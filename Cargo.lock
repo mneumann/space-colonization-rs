@@ -3,6 +3,7 @@ name = "space-colonization"
 version = "0.0.1"
 dependencies = [
  "clap 1.5.5 (registry+https://github.com/rust-lang/crates.io-index)",
+ "eps-writer 0.0.1 (git+https://github.com/mneumann/eps-writer-rs)",
  "kiss3d 0.1.4 (git+https://github.com/Ticki/kiss3d.git)",
  "nalgebra 0.4.0 (registry+https://github.com/rust-lang/crates.io-index)",
  "num 0.1.29 (registry+https://github.com/rust-lang/crates.io-index)",
@@ -56,6 +57,11 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 dependencies = [
  "num 0.1.29 (registry+https://github.com/rust-lang/crates.io-index)",
 ]
+
+[[package]]
+name = "eps-writer"
+version = "0.0.1"
+source = "git+https://github.com/mneumann/eps-writer-rs#f15ec703ab8e581beac8924691263d77f57596c6"
 
 [[package]]
 name = "flate2"

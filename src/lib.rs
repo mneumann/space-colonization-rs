@@ -28,6 +28,7 @@ pub struct SpaceColonization<T, F>
           F: FloatVec<f32> + Zero + Copy
 {
     nodes: Vec<Node<T, F>>,
+    attractors: Vec<T>,
     default_active_lifetime: i32,
     default_inactive_lifetime: i32,
 }
@@ -41,9 +42,18 @@ impl<T, F> SpaceColonization<T, F>
                -> SpaceColonization<T, F> {
         SpaceColonization {
             nodes: Vec::new(),
+            attractors: Vec::new(),
             default_active_lifetime: default_active_lifetime,
             default_inactive_lifetime: default_inactive_lifetime,
         }
+    }
+
+    pub fn attractors(&self) -> &[T] {
+        &self.attractors
+    }
+
+    pub fn add_attractor(&mut self, position: T) {
+        self.attractors.push(position);
     }
 
     pub fn add_root_node(&mut self, position: T) {
@@ -82,7 +92,6 @@ impl<T, F> SpaceColonization<T, F>
     }
 
     pub fn iterate(&mut self,
-                   attraction_points: &mut [(T, bool)],
                    influence_radius: f32,
                    move_distance: f32,
                    kill_distance: f32,
@@ -100,11 +109,9 @@ impl<T, F> SpaceColonization<T, F>
             let nodes = &mut self.nodes[start_index..];
 
             // for each attraction_point, find the nearest node that it influences
-            for ap in attraction_points.iter_mut() {
-                let active = ap.1;
-                if !active {
-                    continue;
-                }
+            let mut ap_idx = 0;
+            'outer: while ap_idx < self.attractors.len() {
+                let ap = self.attractors[ap_idx];
 
                 // find the node nearest to the `ap` attraction point
                 let mut nearest_node: Option<&mut Node<_, _>> = None;
@@ -115,13 +122,13 @@ impl<T, F> SpaceColonization<T, F>
                         continue;
                     }
 
-                    let dist_sq = node.position.sqdist(&ap.0);
+                    let dist_sq = node.position.sqdist(&ap);
 
                     if dist_sq < kill_distance_sq {
-                        // set attraction point inactive
-                        ap.1 = false;
-                        nearest_node = None;
-                        break;
+                        // remove attraction point
+                        self.attractors.swap_remove(ap_idx);
+                        // and continue with "next"
+                        continue 'outer;
                     }
 
                     // is the attraction point within the radius of influence
@@ -134,13 +141,15 @@ impl<T, F> SpaceColonization<T, F>
 
                 if let Some(node) = nearest_node {
                     // update the force with the normalized vector towards the attraction point
-                    let v = (ap.0 - node.position).normalize();
+                    let v = (ap - node.position).normalize();
                     node.growth = node.growth + v;
                     node.growth_count += 1;
                 }
+
+                // go to next attractor point
+                ap_idx += 1;
             }
         }
-
 
         // now create new nodes
         for i in start_index..num_nodes {

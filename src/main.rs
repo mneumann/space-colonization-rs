@@ -141,18 +141,13 @@ fn run<T, F>(config: &Config)
 {
     let mut rng = rand::thread_rng();
 
-    // generate initial attraction point configuration
-    // stores status of attraction point in the second tuple element (true=active, false=used)
-    let mut attraction_points: Vec<(T, bool)> = (0..config.n_attraction_points)
-                                                    .into_iter()
-                                                    .map(|_| {
-                                                        (<T as MyPoint>::random(&mut rng), true)
-                                                    })
-                                                    .collect();
-
     let mut sc: SpaceColonization<T, F> = SpaceColonization::new(10, 1);
     for _ in 0..config.n_roots {
         sc.add_root_node(<T as MyPoint>::random(&mut rng));
+    }
+
+    for _ in 0..config.n_attraction_points {
+        sc.add_attractor(<T as MyPoint>::random(&mut rng));
     }
 
     let mut window = Window::new("Space Colonization");
@@ -170,18 +165,15 @@ fn run<T, F>(config: &Config)
             }
         }
 
-        for &(pt, status) in &attraction_points {
-            if status {
-                window.draw_point(&pt.into_pnt3(), &white);
-            }
+        for &pt in sc.attractors() {
+            window.draw_point(&pt.into_pnt3(), &white);
         }
 
         sc.iter_segments(&mut |&a, &b| {
             window.draw_line(&a.into_pnt3(), &b.into_pnt3(), &red);
         });
 
-        let new_nodes = sc.iterate(&mut attraction_points,
-                                   config.influence_radius,
+        let new_nodes = sc.iterate(config.influence_radius,
                                    config.move_distance,
                                    config.kill_distance,
                                    None);

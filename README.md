@@ -1,7 +1,12 @@
 # space-colonization-rs
-Space-Colonization Algorithm in Rust
 
-## Example
+[Space-Colonization Algorithm][1] in Rust.
+
+## Screenshot
+
+![Space Colonization Algorithm](/screenshot.png?raw=true "Space Colonization")
+
+## Usage
 
 ```sh
 cargo run --example simulate --release -- \
@@ -13,3 +18,5 @@ cargo run --example simulate --release -- \
     --save-every 100 \
     --max-iter 300
 ```
+
+[1]: http://algorithmicbotany.org/papers/colonization.egwnp2007.large.pdf

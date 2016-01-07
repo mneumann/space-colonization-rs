@@ -148,11 +148,13 @@ fn run<T, F>(config: &Config)
 
                 document.add_shape(Box::new(Points(points, 0.005)));
 
+                let mut lines = Vec::new();
                 sc.iter_segments(&mut |&a, &b| {
                     let pt1 = a.into_pnt3();
                     let pt2 = b.into_pnt3();
-                    document.add_shape(Box::new(Line(Position::new(pt1.x, pt1.y), Position::new(pt2.x, pt2.y))));
+                    lines.push((Position::new(pt1.x, pt1.y), Position::new(pt2.x, pt2.y)));
                 });
+                document.add_shape(Box::new(Lines(lines)));
 
                 let mut file = File::create(filename).unwrap();
                 document.write_eps(&mut file, 1.0, 1.0).unwrap();

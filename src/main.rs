@@ -11,18 +11,17 @@ use num::Zero;
 use clap::{Arg, App};
 use std::str::FromStr;
 
-struct Node<T> {
+struct Node<T, F> {
     parent: usize,
     position: T,
+    growth: F,
 }
 
 pub struct SpaceColonization<T, F>
     where T: FloatPnt<f32, F>,
           F: FloatVec<f32> + Zero + Copy
 {
-    nodes: Vec<Node<T>>,
-    leaf_node_pointers: Vec<usize>, // XXX: how can a branch be terminated?
-    leaf_node_grow_directions: Vec<F>,
+    nodes: Vec<Node<T, F>>,
 }
 
 impl<T, F> SpaceColonization<T, F>
@@ -30,72 +29,29 @@ impl<T, F> SpaceColonization<T, F>
           F: FloatVec<f32> + Zero + Copy
 {
     fn new() -> SpaceColonization<T, F> {
-        SpaceColonization {
-            nodes: Vec::new(),
-            leaf_node_pointers: Vec::new(),
-            leaf_node_grow_directions: Vec::new(),
-        }
+        SpaceColonization { nodes: Vec::new() }
     }
 
-    // adds initial root node(s)
-    fn add_root_node(&mut self, pos: T) {
-        debug_assert!(self.leaf_node_pointers.len() == self.leaf_node_grow_directions.len()); // invariant
-
-        // a root node has it's own index as parent
-        let idx = self.nodes.len();
-        self.nodes.push(Node {
-            parent: idx,
-            position: pos,
-        });
-
-        // a root node creates a new "leaf" node (better: branch!)
-        self.leaf_node_pointers.push(idx);
-        self.leaf_node_grow_directions.push(Zero::zero());
-
-        debug_assert!(self.leaf_node_pointers.len() == self.leaf_node_grow_directions.len()); // invariant
+    pub fn add_root_node(&mut self, position: T) {
+        self.add_node(position, None);
     }
 
-    fn add_moved_leaf_node(&mut self, leaf_node_slot: usize, v: F) {
-        let parent = self.leaf_node_pointers[leaf_node_slot];
-        let parent_pos = self.nodes[parent].position;
+    fn add_node(&mut self, position: T, parent: Option<usize>) {
+        // NOTE: a root node has it's own index as parent
+        let len = self.nodes.len();
+        let parent = match parent {
+            Some(p) => {
+                assert!(p < len);
+                p
+            }
+            None => len,
+        };
 
-        self.update_leaf_node(leaf_node_slot, parent_pos + v)
-    }
-
-    fn update_leaf_node(&mut self, leaf_node_slot: usize, new_pos: T) {
-        let parent = self.leaf_node_pointers[leaf_node_slot];
-
-        // create new node
-        let idx = self.nodes.len();
         self.nodes.push(Node {
             parent: parent,
-            position: new_pos,
+            position: position,
+            growth: Zero::zero(),
         });
-
-        // update the leaf node pointer
-        self.leaf_node_pointers[leaf_node_slot] = idx;
-    }
-
-    fn find_nearest_leaf_for_attraction_point(&self,
-                                              attraction_pt: &T,
-                                              radius_influence_sq: f32)
-                                              -> Option<(usize, f32)> {
-        let mut nearest_leaf: Option<usize> = None;
-        let mut nearest_distance_sq: f32 = radius_influence_sq;
-
-        for (i, &leaf_node_ptr) in self.leaf_node_pointers.iter().enumerate() {
-            let leaf_pos = &self.nodes[leaf_node_ptr].position;
-            let dist_sq = leaf_pos.sqdist(attraction_pt);
-
-            // is the attraction point within the radius of influence
-            // and closed than the currently best
-            if dist_sq < nearest_distance_sq {
-                nearest_distance_sq = dist_sq;
-                nearest_leaf = Some(i);
-            }
-        }
-
-        return nearest_leaf.map(|idx| (idx, nearest_distance_sq));
     }
 
     fn iter_segments<C>(&self, callback: &mut C)
@@ -110,48 +66,64 @@ impl<T, F> SpaceColonization<T, F>
 
     fn iterate(&mut self,
                attraction_points: &mut [(T, bool)],
-               radius_influce_sq: f32,
+               influence_radius_sq: f32,
                move_distance: f32,
-               kill_distance_sq: f32) {
-        // reset all attraction forces
-        for force in &mut self.leaf_node_grow_directions {
-            *force = Zero::zero();
-        }
+               kill_distance_sq: f32)
+               -> usize {
+        assert!(kill_distance_sq <= influence_radius_sq);
 
-        // for each attraction_point, find the nearest (leaf) node that it
-        // influences.
+        // for each attraction_point, find the nearest node that it influences
         for ap in attraction_points.iter_mut() {
             let active = ap.1;
             if !active {
                 continue;
             }
-            let nearest_leaf_opt = self.find_nearest_leaf_for_attraction_point(&ap.0,
-                                                                               radius_influce_sq);
-            if let Some((nearest_leaf_slot, d_sq)) = nearest_leaf_opt {
-                if d_sq < kill_distance_sq {
-                    // set inactive
+
+            // find the node nearest to the `ap` attraction point
+            let mut nearest_node: Option<usize> = None;
+            let mut nearest_distance_sq: f32 = influence_radius_sq;
+            for (i, node) in self.nodes.iter().enumerate() {
+                let dist_sq = node.position.sqdist(&ap.0);
+
+                if dist_sq < kill_distance_sq {
+                    // set attraction point inactive
                     ap.1 = false;
-                } else {
-                    let nearest_leaf_node_idx = self.leaf_node_pointers[nearest_leaf_slot];
-                    // update the force with the normalized vector towards the attraction point
-                    let v = (ap.0 - self.nodes[nearest_leaf_node_idx].position).normalize();
-                    self.leaf_node_grow_directions[nearest_leaf_slot] =
-                        self.leaf_node_grow_directions[nearest_leaf_slot] + v;
+                    nearest_node = None;
+                    break;
+                }
+
+                // is the attraction point within the radius of influence
+                // and closer than the currently best
+                if dist_sq < nearest_distance_sq {
+                    nearest_distance_sq = dist_sq;
+                    nearest_node = Some(i);
                 }
             }
-        }
 
-        // now create new leaf nodes
-        for i in 0..self.leaf_node_grow_directions.len() {
-            let force = self.leaf_node_grow_directions[i];
-
-            // update leaf node only if there is a force!
-            if !force.is_zero() {
-                let n = force.normalize();
-                self.add_moved_leaf_node(i, n * move_distance);
+            if let Some(nearest_node_idx) = nearest_node {
+                // update the force with the normalized vector towards the attraction point
+                let v = (ap.0 - self.nodes[nearest_node_idx].position).normalize();
+                self.nodes[nearest_node_idx].growth = self.nodes[nearest_node_idx].growth + v;
             }
         }
 
+        // now create new nodes
+        let mut new_nodes = 0;
+        let len = self.nodes.len();
+        for i in 0..len {
+            let growth = self.nodes[i].growth;
+            // update leaf node only if there is a force!
+            if !growth.is_zero() {
+                new_nodes += 1;
+                let n = growth.normalize();
+                let new_position = self.nodes[i].position + (n * move_distance);
+                self.add_node(new_position, Some(i));
+                // and reset growth attraction forces
+                self.nodes[i].growth = Zero::zero();
+            }
+        }
+
+        return new_nodes;
     }
 }
 
@@ -200,6 +172,7 @@ struct Config {
 }
 
 impl Config {
+    #[allow(dead_code)]
     fn config1() -> Config {
         Config {
             n_attraction_points: 10_000,
@@ -212,6 +185,7 @@ impl Config {
         }
     }
 
+    #[allow(dead_code)]
     fn config2() -> Config {
         Config {
             n_attraction_points: 10_000,
@@ -321,11 +295,14 @@ fn run<T, F>(config: &Config)
             window.draw_line(&a.into_pnt3(), &b.into_pnt3(), &red);
         });
 
-        sc.iterate(&mut attraction_points,
-                   config.influence_radius * config.influence_radius,
-                   config.move_distance,
-                   config.kill_distance * config.kill_distance);
+        let new_nodes = sc.iterate(&mut attraction_points,
+                                   config.influence_radius * config.influence_radius,
+                                   config.move_distance,
+                                   config.kill_distance * config.kill_distance);
 
+        if new_nodes == 0 {
+            break;
+        }
     }
 }
 

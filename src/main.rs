@@ -55,6 +55,7 @@ struct Config {
     kill_distance: f32,
     use_3d: bool,
     max_iter: Option<usize>,
+    save_every: Option<usize>,
 }
 
 impl Config {
@@ -68,6 +69,7 @@ impl Config {
             move_distance: 0.02,
             use_3d: true,
             max_iter: None,
+            save_every: None,
         }
     }
 
@@ -81,6 +83,7 @@ impl Config {
             move_distance: 0.01,
             use_3d: false,
             max_iter: None,
+            save_every: None,
         }
     }
 
@@ -116,6 +119,11 @@ impl Config {
                                    .help("Maximum iterations (default: infinite)")
                                    .takes_value(true)
                                    .required(false))
+                          .arg(Arg::with_name("SAVE_EVERY")
+                                   .long("save-every")
+                                   .help("Save a picture every n iterations (default: none)")
+                                   .takes_value(true)
+                                   .required(false))
                           .arg(Arg::with_name("USE_3D")
                                    .long("use-3d")
                                    .help("Use 3d mode"))
@@ -130,6 +138,7 @@ impl Config {
             move_distance: f32::from_str(matches.value_of("MD").unwrap_or("0.05")).unwrap(),
             use_3d: matches.is_present("USE_3D"),
             max_iter: usize::from_str(matches.value_of("MAX_ITER").unwrap_or("INVALID")).ok(),
+            save_every: usize::from_str(matches.value_of("SAVE_EVERY").unwrap_or("INVALID")).ok(),
         }
     }
 }
@@ -157,8 +166,14 @@ fn run<T, F>(config: &Config)
     let mut i = 0;
 
     while window.render() {
-        i += 1;
-
+        if let Some(n) = config.save_every {
+            // save previous iteration of window.render()
+            if i > 0 && (i - 1) % n == 0 {
+                let img = window.snap_image();
+                let filename = format!("out_{}.png", i - 1);
+                let _ = img.save(&filename).unwrap();
+            }
+        }
         if let Some(m) = config.max_iter {
             if i > m {
                 break;
@@ -179,9 +194,13 @@ fn run<T, F>(config: &Config)
                                    None);
 
         println!("Iteration: {}. New nodes: {}", i, new_nodes);
-        if new_nodes == 0 {
-            break;
-        }
+
+        // if new_nodes == 0 {
+        // break;
+        // }
+        //
+
+        i += 1;
     }
 }
 

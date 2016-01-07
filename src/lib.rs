@@ -86,9 +86,9 @@ impl<T, F> SpaceColonization<T, F>
                 }
 
                 // find the node nearest to the `ap` attraction point
-                let mut nearest_node: Option<usize> = None;
+                let mut nearest_node: Option<&mut Node<_, _>> = None;
                 let mut nearest_distance_sq: f32 = influence_radius_sq;
-                for (i, node) in nodes.iter().enumerate() {
+                for node in nodes.iter_mut() {
                     let dist_sq = node.position.sqdist(&ap.0);
 
                     if dist_sq < kill_distance_sq {
@@ -102,18 +102,17 @@ impl<T, F> SpaceColonization<T, F>
                     // and closer than the currently best
                     if dist_sq < nearest_distance_sq {
                         nearest_distance_sq = dist_sq;
-                        nearest_node = Some(i);
+                        nearest_node = Some(node);
                     }
                 }
 
-                if let Some(nearest_node_idx) = nearest_node {
+                if let Some(node) = nearest_node {
                     // update the force with the normalized vector towards the attraction point
-                    let v = (ap.0 - nodes[nearest_node_idx].position).normalize();
-                    nodes[nearest_node_idx].growth = nodes[nearest_node_idx].growth + v;
-                    nodes[nearest_node_idx].growth_count += 1;
+                    let v = (ap.0 - node.position).normalize();
+                    node.growth = node.growth + v;
+                    node.growth_count += 1;
                 }
             }
-
         }
 
 

@@ -170,7 +170,6 @@ fn run<T, F>(config: &Config)
             }
         }
 
-        println!("Iteration: {}", i);
         for &(pt, status) in &attraction_points {
             if status {
                 window.draw_point(&pt.into_pnt3(), &white);
@@ -182,10 +181,11 @@ fn run<T, F>(config: &Config)
         });
 
         let new_nodes = sc.iterate(&mut attraction_points,
-                                   config.influence_radius * config.influence_radius,
+                                   config.influence_radius,
                                    config.move_distance,
-                                   config.kill_distance * config.kill_distance);
+                                   config.kill_distance);
 
+        println!("Iteration: {}. New nodes: {}", i, new_nodes);
         if new_nodes == 0 {
             break;
         }

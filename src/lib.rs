@@ -8,6 +8,7 @@ struct Node<T, F> {
     parent: usize,
     position: T,
     growth: F,
+    growth_count: usize,
 }
 
 pub struct SpaceColonization<T, F>
@@ -44,6 +45,7 @@ impl<T, F> SpaceColonization<T, F>
             parent: parent,
             position: position,
             growth: Zero::zero(),
+            growth_count: 0,
         });
     }
 
@@ -59,10 +61,13 @@ impl<T, F> SpaceColonization<T, F>
 
     pub fn iterate(&mut self,
                    attraction_points: &mut [(T, bool)],
-                   influence_radius_sq: f32,
+                   influence_radius: f32,
                    move_distance: f32,
-                   kill_distance_sq: f32)
+                   kill_distance: f32)
                    -> usize {
+        let kill_distance_sq = kill_distance * kill_distance;
+        let influence_radius_sq = influence_radius * influence_radius;
+
         assert!(kill_distance_sq <= influence_radius_sq);
 
         // for each attraction_point, find the nearest node that it influences
@@ -97,25 +102,25 @@ impl<T, F> SpaceColonization<T, F>
                 // update the force with the normalized vector towards the attraction point
                 let v = (ap.0 - self.nodes[nearest_node_idx].position).normalize();
                 self.nodes[nearest_node_idx].growth = self.nodes[nearest_node_idx].growth + v;
+                self.nodes[nearest_node_idx].growth_count += 1;
             }
         }
 
         // now create new nodes
-        let mut new_nodes = 0;
         let len = self.nodes.len();
         for i in 0..len {
-            let growth = self.nodes[i].growth;
-            // update leaf node only if there is a force!
-            if !growth.is_zero() {
-                new_nodes += 1;
-                let n = growth.normalize();
-                let new_position = self.nodes[i].position + (n * move_distance);
+            if self.nodes[i].growth_count > 0 {
+                let d = self.nodes[i].growth.normalize() * move_distance;
+                let new_position = self.nodes[i].position + d;
                 self.add_node(new_position, Some(i));
-                // and reset growth attraction forces
-                self.nodes[i].growth = Zero::zero();
             }
+            // and reset growth attraction forces
+            self.nodes[i].growth = Zero::zero();
+            self.nodes[i].growth_count = 0;
         }
 
-        return new_nodes;
+        // Note that nodes can oscillate, between two attraction points, so
+        // it's better to stop after a certain number of iterations
+        return self.nodes.len() - len;
     }
 }

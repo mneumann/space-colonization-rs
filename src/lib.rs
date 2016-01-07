@@ -8,6 +8,17 @@ use std::cmp;
 struct Node<T, F> {
     parent: usize,
     position: T,
+
+    // The active_lifetime of a node is reduced every
+    // time it is found being the closest node to some
+    // attraction point. If it hits 0, the node
+    // is no longer used.
+    active_lifetime: i32,
+    // The inactive_lifetime is reduce whenever a node
+    // is not being found as the closest towards an
+    // attraction point.
+    inactive_lifetime: i32,
+
     growth: F,
     growth_count: usize,
 }
@@ -17,14 +28,22 @@ pub struct SpaceColonization<T, F>
           F: FloatVec<f32> + Zero + Copy
 {
     nodes: Vec<Node<T, F>>,
+    default_active_lifetime: i32,
+    default_inactive_lifetime: i32,
 }
 
 impl<T, F> SpaceColonization<T, F>
     where T: FloatPnt<f32, F>,
           F: FloatVec<f32> + Zero + Copy
 {
-    pub fn new() -> SpaceColonization<T, F> {
-        SpaceColonization { nodes: Vec::new() }
+    pub fn new(default_active_lifetime: i32,
+               default_inactive_lifetime: i32)
+               -> SpaceColonization<T, F> {
+        SpaceColonization {
+            nodes: Vec::new(),
+            default_active_lifetime: default_active_lifetime,
+            default_inactive_lifetime: default_inactive_lifetime,
+        }
     }
 
     pub fn add_root_node(&mut self, position: T) {
@@ -45,6 +64,8 @@ impl<T, F> SpaceColonization<T, F>
         self.nodes.push(Node {
             parent: parent,
             position: position,
+            active_lifetime: self.default_active_lifetime,
+            inactive_lifetime: self.default_inactive_lifetime,
             growth: Zero::zero(),
             growth_count: 0,
         });
@@ -89,6 +110,11 @@ impl<T, F> SpaceColonization<T, F>
                 let mut nearest_node: Option<&mut Node<_, _>> = None;
                 let mut nearest_distance_sq: f32 = influence_radius_sq;
                 for node in nodes.iter_mut() {
+                    if node.inactive_lifetime <= 0 || node.active_lifetime <= 0 {
+                        // The node has become inactive
+                        continue;
+                    }
+
                     let dist_sq = node.position.sqdist(&ap.0);
 
                     if dist_sq < kill_distance_sq {
@@ -122,6 +148,11 @@ impl<T, F> SpaceColonization<T, F>
                 let d = self.nodes[i].growth.normalize() * move_distance;
                 let new_position = self.nodes[i].position + d;
                 self.add_node(new_position, Some(i));
+
+                self.nodes[i].active_lifetime -= 1;
+                self.nodes[i].inactive_lifetime = self.default_inactive_lifetime; // XXX
+            } else {
+                self.nodes[i].inactive_lifetime -= 1;
             }
             // and reset growth attraction forces
             self.nodes[i].growth = Zero::zero();

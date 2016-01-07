@@ -150,7 +150,7 @@ fn run<T, F>(config: &Config)
                                                     })
                                                     .collect();
 
-    let mut sc: SpaceColonization<T, F> = SpaceColonization::new();
+    let mut sc: SpaceColonization<T, F> = SpaceColonization::new(10, 1);
     for _ in 0..config.n_roots {
         sc.add_root_node(<T as MyPoint>::random(&mut rng));
     }

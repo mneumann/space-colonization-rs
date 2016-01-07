@@ -3,6 +3,7 @@ extern crate num;
 
 use na::{Norm, FloatPnt, FloatVec};
 use num::Zero;
+use std::cmp;
 
 struct Node<T, F> {
     parent: usize,
@@ -63,52 +64,61 @@ impl<T, F> SpaceColonization<T, F>
                    attraction_points: &mut [(T, bool)],
                    influence_radius: f32,
                    move_distance: f32,
-                   kill_distance: f32)
+                   kill_distance: f32,
+                   use_last_n_nodes: Option<usize>)
                    -> usize {
         let kill_distance_sq = kill_distance * kill_distance;
         let influence_radius_sq = influence_radius * influence_radius;
-
         assert!(kill_distance_sq <= influence_radius_sq);
 
-        // for each attraction_point, find the nearest node that it influences
-        for ap in attraction_points.iter_mut() {
-            let active = ap.1;
-            if !active {
-                continue;
-            }
+        let num_nodes = self.nodes.len();
+        let use_last_nodes: usize = cmp::min(num_nodes, use_last_n_nodes.unwrap_or(num_nodes));
+        let start_index = num_nodes - use_last_nodes;
 
-            // find the node nearest to the `ap` attraction point
-            let mut nearest_node: Option<usize> = None;
-            let mut nearest_distance_sq: f32 = influence_radius_sq;
-            for (i, node) in self.nodes.iter().enumerate() {
-                let dist_sq = node.position.sqdist(&ap.0);
+        {
+            let nodes = &mut self.nodes[start_index..];
 
-                if dist_sq < kill_distance_sq {
-                    // set attraction point inactive
-                    ap.1 = false;
-                    nearest_node = None;
-                    break;
+            // for each attraction_point, find the nearest node that it influences
+            for ap in attraction_points.iter_mut() {
+                let active = ap.1;
+                if !active {
+                    continue;
                 }
 
-                // is the attraction point within the radius of influence
-                // and closer than the currently best
-                if dist_sq < nearest_distance_sq {
-                    nearest_distance_sq = dist_sq;
-                    nearest_node = Some(i);
+                // find the node nearest to the `ap` attraction point
+                let mut nearest_node: Option<usize> = None;
+                let mut nearest_distance_sq: f32 = influence_radius_sq;
+                for (i, node) in nodes.iter().enumerate() {
+                    let dist_sq = node.position.sqdist(&ap.0);
+
+                    if dist_sq < kill_distance_sq {
+                        // set attraction point inactive
+                        ap.1 = false;
+                        nearest_node = None;
+                        break;
+                    }
+
+                    // is the attraction point within the radius of influence
+                    // and closer than the currently best
+                    if dist_sq < nearest_distance_sq {
+                        nearest_distance_sq = dist_sq;
+                        nearest_node = Some(i);
+                    }
+                }
+
+                if let Some(nearest_node_idx) = nearest_node {
+                    // update the force with the normalized vector towards the attraction point
+                    let v = (ap.0 - nodes[nearest_node_idx].position).normalize();
+                    nodes[nearest_node_idx].growth = nodes[nearest_node_idx].growth + v;
+                    nodes[nearest_node_idx].growth_count += 1;
                 }
             }
 
-            if let Some(nearest_node_idx) = nearest_node {
-                // update the force with the normalized vector towards the attraction point
-                let v = (ap.0 - self.nodes[nearest_node_idx].position).normalize();
-                self.nodes[nearest_node_idx].growth = self.nodes[nearest_node_idx].growth + v;
-                self.nodes[nearest_node_idx].growth_count += 1;
-            }
         }
 
+
         // now create new nodes
-        let len = self.nodes.len();
-        for i in 0..len {
+        for i in start_index..num_nodes {
             if self.nodes[i].growth_count > 0 {
                 let d = self.nodes[i].growth.normalize() * move_distance;
                 let new_position = self.nodes[i].position + d;
@@ -121,6 +131,6 @@ impl<T, F> SpaceColonization<T, F>
 
         // Note that nodes can oscillate, between two attraction points, so
         // it's better to stop after a certain number of iterations
-        return self.nodes.len() - len;
+        return self.nodes.len() - num_nodes;
     }
 }

@@ -183,7 +183,8 @@ fn run<T, F>(config: &Config)
         let new_nodes = sc.iterate(&mut attraction_points,
                                    config.influence_radius,
                                    config.move_distance,
-                                   config.kill_distance);
+                                   config.kill_distance,
+                                   None);
 
         println!("Iteration: {}. New nodes: {}", i, new_nodes);
         if new_nodes == 0 {

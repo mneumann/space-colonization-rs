@@ -1,17 +1,17 @@
 extern crate space_colonization;
 extern crate nalgebra as na;
-extern crate kiss3d;
 extern crate rand;
 extern crate num;
 extern crate clap;
+extern crate eps_writer;
 
-use kiss3d::window::Window;
-use na::{Pnt2, Pnt3, Vec2, Vec3, FloatPnt, FloatVec};
+use na::{Pnt2, Vec2, Pnt3, FloatPnt, FloatVec};
 use rand::{Rng, Closed01};
 use num::Zero;
 use clap::{Arg, App};
 use std::str::FromStr;
 use space_colonization::SpaceColonization;
+use eps_writer::*;
 use std::fs::File;
 
 fn random_closed01<R: Rng>(rng: &mut R) -> f32 {
@@ -60,34 +60,6 @@ struct Config {
 }
 
 impl Config {
-    #[allow(dead_code)]
-    fn config1() -> Config {
-        Config {
-            n_attraction_points: 10_000,
-            n_roots: 5,
-            influence_radius: 0.44,
-            kill_distance: 0.22,
-            move_distance: 0.02,
-            use_3d: true,
-            max_iter: None,
-            save_every: None,
-        }
-    }
-
-    #[allow(dead_code)]
-    fn config2() -> Config {
-        Config {
-            n_attraction_points: 10_000,
-            n_roots: 5,
-            influence_radius: 0.1,
-            kill_distance: 0.07,
-            move_distance: 0.01,
-            use_3d: false,
-            max_iter: None,
-            save_every: None,
-        }
-    }
-
     fn from_cmd() -> Config {
         let matches = App::new("space-colonization")
                           .arg(Arg::with_name("NUM_POINTS")
@@ -160,34 +132,38 @@ fn run<T, F>(config: &Config)
         sc.add_attractor(<T as MyPoint>::random(&mut rng));
     }
 
-    let mut window = Window::new("Space Colonization");
-    let white = Pnt3::new(1.0, 1.0, 1.0);
-    let red = Pnt3::new(1.0, 0.0, 0.0);
-
     let mut i = 0;
 
-    while window.render() {
+    loop {
         if let Some(n) = config.save_every {
-            // save previous iteration of window.render()
-            if i > 0 && (i - 1) % n == 0 {
-                let img = window.snap_image();
-                let filename = format!("out_{}.png", i - 1);
-                let _ = img.save(&filename).unwrap();
+            // save current iteration as eps
+            if i % n == 0 {
+                let filename = format!("out_{}.eps", i);
+                let mut document = EpsDocument::new();
+
+                let points: Vec<_> = sc.attractors().iter().map(|&pt| {
+                     let pnt = pt.into_pnt3();
+                     Position::new(pnt.x, pnt.y)
+                }).collect();
+
+                document.add_shape(Box::new(Points(points, 0.005)));
+
+                sc.iter_segments(&mut |&a, &b| {
+                    let pt1 = a.into_pnt3();
+                    let pt2 = b.into_pnt3();
+                    document.add_shape(Box::new(Line(Position::new(pt1.x, pt1.y), Position::new(pt2.x, pt2.y))));
+                });
+
+                let mut file = File::create(filename).unwrap();
+                document.write_eps(&mut file, 1.0, 1.0).unwrap();
             }
         }
+
         if let Some(m) = config.max_iter {
             if i > m {
                 break;
             }
         }
-
-        for &pt in sc.attractors() {
-            window.draw_point(&pt.into_pnt3(), &white);
-        }
-
-        sc.iter_segments(&mut |&a, &b| {
-            window.draw_line(&a.into_pnt3(), &b.into_pnt3(), &red);
-        });
 
         let new_nodes = sc.iterate(config.influence_radius,
                                    config.move_distance,
@@ -200,15 +176,10 @@ fn run<T, F>(config: &Config)
     }
 }
 
-
 fn main() {
     let config = Config::from_cmd();
 
     println!("{:?}", config);
-
-    if config.use_3d {
-        run::<Pnt3<f32>, Vec3<f32>>(&config);
-    } else {
-        run::<Pnt2<f32>, Vec2<f32>>(&config);
-    }
+    assert!(config.use_3d == false);
+    run::<Pnt2<f32>, Vec2<f32>>(&config);
 }

@@ -61,7 +61,7 @@ dependencies = [
 [[package]]
 name = "eps-writer"
 version = "0.0.1"
-source = "git+https://github.com/mneumann/eps-writer-rs#f15ec703ab8e581beac8924691263d77f57596c6"
+source = "git+https://github.com/mneumann/eps-writer-rs#70d35d1d4bebf4579d2fdb68e79b5a8878d0268b"
 
 [[package]]
 name = "flate2"

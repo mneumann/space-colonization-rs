@@ -11,12 +11,16 @@ use num::Zero;
 use clap::{Arg, App};
 use std::str::FromStr;
 
-struct SpaceColonization<T, F>
+struct Node<T> {
+    parent: usize,
+    position: T,
+}
+
+pub struct SpaceColonization<T, F>
     where T: FloatPnt<f32, F>,
           F: FloatVec<f32> + Zero + Copy
 {
-    node_parents: Vec<usize>,
-    node_positions: Vec<T>,
+    nodes: Vec<Node<T>>,
     leaf_node_pointers: Vec<usize>, // XXX: how can a branch be terminated?
     leaf_node_grow_directions: Vec<F>,
 }
@@ -27,8 +31,7 @@ impl<T, F> SpaceColonization<T, F>
 {
     fn new() -> SpaceColonization<T, F> {
         SpaceColonization {
-            node_parents: Vec::new(),
-            node_positions: Vec::new(),
+            nodes: Vec::new(),
             leaf_node_pointers: Vec::new(),
             leaf_node_grow_directions: Vec::new(),
         }
@@ -36,26 +39,25 @@ impl<T, F> SpaceColonization<T, F>
 
     // adds initial root node(s)
     fn add_root_node(&mut self, pos: T) {
-        debug_assert!(self.node_positions.len() == self.node_parents.len()); // invariant
         debug_assert!(self.leaf_node_pointers.len() == self.leaf_node_grow_directions.len()); // invariant
 
-        let idx = self.node_positions.len();
-        self.node_positions.push(pos);
-
         // a root node has it's own index as parent
-        self.node_parents.push(idx);
+        let idx = self.nodes.len();
+        self.nodes.push(Node {
+            parent: idx,
+            position: pos,
+        });
 
         // a root node creates a new "leaf" node (better: branch!)
         self.leaf_node_pointers.push(idx);
         self.leaf_node_grow_directions.push(Zero::zero());
 
-        debug_assert!(self.node_positions.len() == self.node_parents.len()); // invariant
         debug_assert!(self.leaf_node_pointers.len() == self.leaf_node_grow_directions.len()); // invariant
     }
 
     fn add_moved_leaf_node(&mut self, leaf_node_slot: usize, v: F) {
         let parent = self.leaf_node_pointers[leaf_node_slot];
-        let parent_pos = self.node_positions[parent];
+        let parent_pos = self.nodes[parent].position;
 
         self.update_leaf_node(leaf_node_slot, parent_pos + v)
     }
@@ -64,9 +66,11 @@ impl<T, F> SpaceColonization<T, F>
         let parent = self.leaf_node_pointers[leaf_node_slot];
 
         // create new node
-        let idx = self.node_positions.len();
-        self.node_positions.push(new_pos);
-        self.node_parents.push(parent);
+        let idx = self.nodes.len();
+        self.nodes.push(Node {
+            parent: parent,
+            position: new_pos,
+        });
 
         // update the leaf node pointer
         self.leaf_node_pointers[leaf_node_slot] = idx;
@@ -80,7 +84,7 @@ impl<T, F> SpaceColonization<T, F>
         let mut nearest_distance_sq: f32 = radius_influence_sq;
 
         for (i, &leaf_node_ptr) in self.leaf_node_pointers.iter().enumerate() {
-            let leaf_pos = &self.node_positions[leaf_node_ptr];
+            let leaf_pos = &self.nodes[leaf_node_ptr].position;
             let dist_sq = leaf_pos.sqdist(attraction_pt);
 
             // is the attraction point within the radius of influence
@@ -97,9 +101,9 @@ impl<T, F> SpaceColonization<T, F>
     fn iter_segments<C>(&self, callback: &mut C)
         where C: FnMut(&T, &T)
     {
-        for (i, &parent) in self.node_parents.iter().enumerate() {
-            if i != parent {
-                callback(&self.node_positions[i], &self.node_positions[parent]);
+        for (i, node) in self.nodes.iter().enumerate() {
+            if i != node.parent {
+                callback(&node.position, &self.nodes[node.parent].position);
             }
         }
     }
@@ -130,7 +134,7 @@ impl<T, F> SpaceColonization<T, F>
                 } else {
                     let nearest_leaf_node_idx = self.leaf_node_pointers[nearest_leaf_slot];
                     // update the force with the normalized vector towards the attraction point
-                    let v = (ap.0 - self.node_positions[nearest_leaf_node_idx]).normalize();
+                    let v = (ap.0 - self.nodes[nearest_leaf_node_idx].position).normalize();
                     self.leaf_node_grow_directions[nearest_leaf_slot] =
                         self.leaf_node_grow_directions[nearest_leaf_slot] + v;
                 }

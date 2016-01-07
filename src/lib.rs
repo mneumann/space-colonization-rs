@@ -20,7 +20,7 @@ struct Node<T, F> {
     inactive_lifetime: i32,
 
     growth: F,
-    growth_count: usize,
+    growth_count: u32,
 }
 
 pub struct SpaceColonization<T, F>
@@ -153,19 +153,22 @@ impl<T, F> SpaceColonization<T, F>
 
         // now create new nodes
         for i in start_index..num_nodes {
-            if self.nodes[i].growth_count > 0 {
-                let d = self.nodes[i].growth.normalize() * move_distance;
+            let growth_count = self.nodes[i].growth_count;
+            if growth_count > 0 {
+                let growth_factor = 1.0; //((growth_count + 1) as f32).ln();
+                let d = self.nodes[i].growth.normalize() * move_distance * growth_factor;
                 let new_position = self.nodes[i].position + d;
                 self.add_node(new_position, Some(i));
 
                 self.nodes[i].active_lifetime -= 1;
                 self.nodes[i].inactive_lifetime = self.default_inactive_lifetime; // XXX
+
+                // and reset growth attraction forces
+                self.nodes[i].growth = Zero::zero();
+                self.nodes[i].growth_count = 0;
             } else {
                 self.nodes[i].inactive_lifetime -= 1;
             }
-            // and reset growth attraction forces
-            self.nodes[i].growth = Zero::zero();
-            self.nodes[i].growth_count = 0;
         }
 
         // Note that nodes can oscillate, between two attraction points, so

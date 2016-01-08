@@ -61,7 +61,7 @@ dependencies = [
 [[package]]
 name = "eps-writer"
 version = "0.0.1"
-source = "git+https://github.com/mneumann/eps-writer-rs#b112ba84e71646017a14e8618bf62330fac6d8f3"
+source = "git+https://github.com/mneumann/eps-writer-rs#5063e8908480d30be023da252ed33830472a3406"
 dependencies = [
  "nalgebra 0.4.0 (registry+https://github.com/rust-lang/crates.io-index)",
 ]

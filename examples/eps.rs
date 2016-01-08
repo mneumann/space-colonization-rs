@@ -124,7 +124,10 @@ fn run<T, F>(config: &Config)
 {
     let mut rng = rand::thread_rng();
 
-    let mut sc: SpaceColonization<T, F> = SpaceColonization::new(10, 1);
+    let mut sc: SpaceColonization<T, F> = SpaceColonization::new(10, 1,
+        config.influence_radius.powi(2),
+        config.kill_distance.powi(2));
+
     for _ in 0..config.n_roots {
         sc.add_root_node(<T as MyPoint>::random(&mut rng));
     }
@@ -142,8 +145,8 @@ fn run<T, F>(config: &Config)
                 let filename = format!("out_{:05}.eps", i);
                 let mut document = EpsDocument::new();
 
-                let points: Vec<_> = sc.attractors().iter().map(|&pt| {
-                     let pnt = pt.into_pnt3();
+                let points: Vec<_> = sc.attractors().iter().map(|attractor| {
+                     let pnt = attractor.position.into_pnt3();
                      Position::new(pnt.x, pnt.y)
                 }).collect();
 
@@ -171,10 +174,7 @@ fn run<T, F>(config: &Config)
             }
         }
 
-        let new_nodes = sc.iterate(config.influence_radius,
-                                   config.move_distance,
-                                   config.kill_distance,
-                                   None);
+        let new_nodes = sc.iterate(config.move_distance, None);
 
         println!("Iteration: {}. New nodes: {}", i, new_nodes);
 

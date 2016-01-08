@@ -12,7 +12,6 @@ use num::Zero;
 use clap::{Arg, App};
 use std::str::FromStr;
 use space_colonization::SpaceColonization;
-use std::fs::File;
 
 fn random_closed01<R: Rng>(rng: &mut R) -> f32 {
     rng.gen::<Closed01<f32>>().0
@@ -151,7 +150,10 @@ fn run<T, F>(config: &Config)
 {
     let mut rng = rand::thread_rng();
 
-    let mut sc: SpaceColonization<T, F> = SpaceColonization::new(10, 1);
+    let mut sc: SpaceColonization<T, F> = SpaceColonization::new(10, 1,
+        config.influence_radius.powi(2),
+        config.kill_distance.powi(2));
+
     for _ in 0..config.n_roots {
         sc.add_root_node(<T as MyPoint>::random(&mut rng));
     }
@@ -181,18 +183,15 @@ fn run<T, F>(config: &Config)
             }
         }
 
-        for &pt in sc.attractors() {
-            window.draw_point(&pt.into_pnt3(), &white);
+        for attractor in sc.attractors() {
+            window.draw_point(&attractor.position.into_pnt3(), &white);
         }
 
         sc.iter_segments(&mut |&a, &b| {
             window.draw_line(&a.into_pnt3(), &b.into_pnt3(), &red);
         });
 
-        let new_nodes = sc.iterate(config.influence_radius,
-                                   config.move_distance,
-                                   config.kill_distance,
-                                   None);
+        let new_nodes = sc.iterate(config.move_distance, None);
 
         println!("Iteration: {}. New nodes: {}", i, new_nodes);
 

@@ -61,7 +61,10 @@ dependencies = [
 [[package]]
 name = "eps-writer"
 version = "0.0.1"
-source = "git+https://github.com/mneumann/eps-writer-rs#05d928ac4770f237fac24196b33f37002f14906d"
+source = "git+https://github.com/mneumann/eps-writer-rs#b112ba84e71646017a14e8618bf62330fac6d8f3"
+dependencies = [
+ "nalgebra 0.4.0 (registry+https://github.com/rust-lang/crates.io-index)",
+]
 
 [[package]]
 name = "flate2"

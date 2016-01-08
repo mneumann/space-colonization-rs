@@ -2,6 +2,10 @@
 
 [Space-Colonization Algorithm][1] in Rust.
 
+## In Action
+
+![Space Colonization Algorithm](/animated.gif?raw=true "Space Colonization")
+
 ## Screenshot
 
 ![Space Colonization Algorithm](/screenshot.png?raw=true "Space Colonization")

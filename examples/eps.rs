@@ -11,7 +11,7 @@ use num::Zero;
 use clap::{Arg, App};
 use std::str::FromStr;
 use space_colonization::SpaceColonization;
-use eps_writer::*;
+use eps_writer::{EpsDocument, Position, Points, Lines, SetRGB};
 use std::fs::File;
 
 fn random_closed01<R: Rng>(rng: &mut R) -> f32 {
@@ -116,6 +116,7 @@ impl Config {
     }
 }
 
+const SCALE: f32 = 400.0;
 
 fn run<T, F>(config: &Config)
     where T: MyPoint + FloatPnt<f32, F>,
@@ -138,7 +139,7 @@ fn run<T, F>(config: &Config)
         if let Some(n) = config.save_every {
             // save current iteration as eps
             if i % n == 0 {
-                let filename = format!("out_{}.eps", i);
+                let filename = format!("out_{:05}.eps", i);
                 let mut document = EpsDocument::new();
 
                 let points: Vec<_> = sc.attractors().iter().map(|&pt| {
@@ -146,7 +147,7 @@ fn run<T, F>(config: &Config)
                      Position::new(pnt.x, pnt.y)
                 }).collect();
 
-                document.add_shape(Box::new(Points(points, 0.005)));
+                document.add_shape(Box::new(Points(points, 0.005*SCALE/2.0)));
 
                 let mut lines = Vec::new();
                 sc.iter_segments(&mut |&a, &b| {
@@ -154,10 +155,13 @@ fn run<T, F>(config: &Config)
                     let pt2 = b.into_pnt3();
                     lines.push((Position::new(pt1.x, pt1.y), Position::new(pt2.x, pt2.y)));
                 });
+                document.add_shape(Box::new(SetRGB(1.0, 0.0, 0.0)));
                 document.add_shape(Box::new(Lines(lines)));
 
+                document.transform(Vec2::new(1.0, 1.0), Vec2::new(SCALE/2.0, SCALE/2.0));
+
                 let mut file = File::create(filename).unwrap();
-                document.write_eps(&mut file, 1.0, 1.0).unwrap();
+                document.write_eps(&mut file, 100.0, 100.0).unwrap();
             }
         }
 

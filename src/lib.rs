@@ -50,6 +50,18 @@ pub struct Attractor<P, I: Copy> {
     /// Action performed when a node comes closer
     /// than ```connect_radius```.
     connect_action: ConnectAction,
+
+    /// Starting from which iteration this attractor is active
+    active_from_iteration: u32,
+}
+
+impl<P, I: Copy> Attractor<P, I> {
+    fn is_active(&self, current_iteration: u32) -> bool {
+        current_iteration >= self.active_from_iteration
+    }
+    fn disable_until(&mut self, iteration: u32) {
+        self.active_from_iteration = iteration;
+    }
 }
 
 #[derive(Debug, Copy, Clone)]
@@ -144,6 +156,7 @@ impl<P, F, I> SpaceColonization<P, F, I>
             position: position,
             information: I::default(),
             connect_action: ConnectAction::KillAttractor,
+            active_from_iteration: 0,
         });
     }
 
@@ -217,15 +230,22 @@ impl<P, F, I> Iterator for SpaceColonization<P, F, I>
     type Item = usize;
 
     fn next(&mut self) -> Option<Self::Item> {
+        let current_iteration = self.next_iteration;
+        self.next_iteration += 1;
         let num_nodes = self.nodes.len();
         let use_last_nodes: usize = cmp::min(num_nodes, self.use_last_n_nodes.unwrap_or(num_nodes));
         let start_index = num_nodes - use_last_nodes;
-        self.next_iteration += 1;
 
         // for each attraction_point, find the nearest node that it influences
         let mut ap_idx = 0;
         'outer: while ap_idx < self.attractors.len() {
             let ap = self.attractors[ap_idx];
+
+            if !ap.is_active(current_iteration) {
+                // is attractor is not active in the current iteration goto next.
+                ap_idx += 1;
+                continue;
+            }
 
             let nodes = &mut self.nodes[start_index..];
 
@@ -265,8 +285,8 @@ impl<P, F, I> Iterator for SpaceColonization<P, F, I>
                         // and continue with "next" (without increasing ap_idx)
                         continue 'outer;
                     }
-                    ConnectAction::DisableFor {iterations: _} => {
-                        unimplemented!();
+                    ConnectAction::DisableFor {iterations} => {
+                        self.attractors[ap_idx].disable_until(current_iteration + iterations);
                     }
                 }
             } else if let Some(node) = nearest_node {

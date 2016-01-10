@@ -52,15 +52,18 @@ pub struct Attractor<P, I> {
     connect_action: ConnectAction,
 }
 
+#[derive(Debug, Copy, Clone)]
+struct NodeIdx(u32, u32);
+
 struct Node<P, F> {
     /// Index of the direct parent.
-    parent: usize,
+    parent: NodeIdx,
+
+    /// Index of the root node this node is associated with.
+    root: NodeIdx,
 
     /// Number of nodes between this node and the root node.
     length: usize,
-
-    /// Index of the root node this node is associated with.
-    root: usize,
 
     /// The node's coordinate position.
     position: P,
@@ -78,8 +81,14 @@ struct Node<P, F> {
     growth: F,
     growth_count: u32,
 }
+
 impl<P, F> Node<P, F> {
     fn send_information(&mut self, _information: ()) {}
+
+    fn is_root(&self) -> bool {
+        // self.root == self.parent
+        self.length == 0
+    }
 }
 
 pub struct SpaceColonization<P, F>
@@ -132,15 +141,21 @@ impl<P, F> SpaceColonization<P, F>
         self.add_node(position, None);
     }
 
-    fn add_node(&mut self, position: P, parent: Option<usize>) {
-        // NOTE: a root node has it's own index as parent and root.
-        let len = self.nodes.len();
+    fn get_node(&self, node_idx: NodeIdx) -> Option<&Node<P, F>> {
+        self.nodes.get(node_idx.0 as usize)
+    }
+
+    fn add_node(&mut self, position: P, parent: Option<NodeIdx>) {
         let (parent, root, length) = match parent {
             Some(p) => {
-                assert!(p < len);
-                (p, self.nodes[p].root, self.nodes[p].length + 1)
+                let parent_node = self.get_node(p).unwrap();
+                (p, parent_node.root, parent_node.length + 1)
             }
-            None => (len, len, 0),
+            None => {
+                // A root node has it's own index as parent and root.
+                let len = self.nodes.len();
+                (NodeIdx(len as u32, 0), NodeIdx(len as u32, 0), 0)
+            }
         };
 
         self.nodes.push(Node {
@@ -158,9 +173,10 @@ impl<P, F> SpaceColonization<P, F>
     pub fn iter_segments<C>(&self, callback: &mut C)
         where C: FnMut(&P, &P)
     {
-        for (i, node) in self.nodes.iter().enumerate() {
-            if i != node.parent {
-                callback(&node.position, &self.nodes[node.parent].position);
+        for node in self.nodes.iter() {
+            if !node.is_root() {
+                callback(&node.position,
+                         &self.get_node(node.parent).unwrap().position);
             }
         }
     }
@@ -238,7 +254,7 @@ impl<P, F> SpaceColonization<P, F>
                 let growth_factor = 1.0; //((growth_count + 1) as f32).ln();
                 let d = self.nodes[i].growth.normalize() * move_distance * growth_factor;
                 let new_position = self.nodes[i].position + d;
-                self.add_node(new_position, Some(i));
+                self.add_node(new_position, Some(NodeIdx(i as u32, 0)));
 
                 self.nodes[i].active_lifetime -= 1;
                 self.nodes[i].inactive_lifetime = self.default_inactive_lifetime; // XXX

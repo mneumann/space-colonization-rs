@@ -145,18 +145,16 @@ fn run<T, F>(config: &Config)
                 let filename = format!("out_{:05}.eps", i);
                 let mut document = EpsDocument::new();
 
-                let points: Vec<_> = sc.attractors()
-                                       .iter()
-                                       .map(|attractor| {
-                                           let pnt = attractor.position.into_pnt3();
-                                           Position::new(pnt.x, pnt.y)
-                                       })
-                                       .collect();
+                let mut points = Vec::new();
+                sc.visit_attractor_points(&mut|position| {
+                                           let pnt = position.into_pnt3();
+                                           points.push(Position::new(pnt.x, pnt.y));
+                                       });
 
                 document.add_shape(Box::new(Points(points, 0.005 * SCALE / 2.0)));
 
                 let mut lines = Vec::new();
-                sc.iter_segments(&mut |&a, &b| {
+                sc.visit_node_segments(&mut |&a, &b| {
                     let pt1 = a.into_pnt3();
                     let pt2 = b.into_pnt3();
                     lines.push((Position::new(pt1.x, pt1.y), Position::new(pt2.x, pt2.y)));

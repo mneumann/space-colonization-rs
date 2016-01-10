@@ -40,7 +40,7 @@ pub struct Attractor<P, I> {
     strength: f32,
 
     /// The position of the attractor.
-    pub position: P,
+    position: P,
 
     /// The attractor carries a bit of information.
     /// When a node comes closer than ```connect_radius```
@@ -110,10 +110,6 @@ impl<P, F> SpaceColonization<P, F>
         }
     }
 
-    pub fn attractors(&self) -> &[Attractor<P, ()>] {
-        &self.attractors
-    }
-
     pub fn add_attractor(&mut self, position: P) {
         self.attractors.push(Attractor {
             attract_dist: self.default_attract_dist,
@@ -156,14 +152,22 @@ impl<P, F> SpaceColonization<P, F>
         });
     }
 
-    pub fn iter_segments<C>(&self, callback: &mut C)
-        where C: FnMut(&P, &P)
+    pub fn visit_node_segments<V>(&self, visitor: &mut V)
+        where V: FnMut(&P, &P)
     {
         for node in self.nodes.iter() {
             if !node.is_root() {
-                callback(&node.position,
-                         &self.get_node(node.parent).unwrap().position);
+                visitor(&node.position,
+                        &self.get_node(node.parent).unwrap().position);
             }
+        }
+    }
+
+    pub fn visit_attractor_points<V>(&self, visitor: &mut V)
+        where V: FnMut(&P)
+    {
+        for attractor in self.attractors.iter() {
+            visitor(&attractor.position)
         }
     }
 

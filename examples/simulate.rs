@@ -150,9 +150,9 @@ fn run<T, F>(config: &Config)
 {
     let mut rng = rand::thread_rng();
 
-    let mut sc: SpaceColonization<T, F> = SpaceColonization::new(
-        SqDist::from_dist(config.influence_radius),
-        SqDist::from_dist(config.kill_distance));
+    let mut sc: SpaceColonization<T, F> =
+        SpaceColonization::new(SqDist::from_dist(config.influence_radius),
+                               SqDist::from_dist(config.kill_distance));
 
     for _ in 0..config.n_roots {
         sc.add_root_node(<T as MyPoint>::random(&mut rng));
@@ -183,12 +183,10 @@ fn run<T, F>(config: &Config)
             }
         }
 
-        for attractor in sc.attractors() {
-            window.draw_point(&attractor.position.into_pnt3(), &white);
-        }
+        sc.visit_attractor_points(&mut |position| window.draw_point(&position.into_pnt3(), &white));
 
-        sc.iter_segments(&mut |&a, &b| {
-            window.draw_line(&a.into_pnt3(), &b.into_pnt3(), &red);
+        sc.visit_node_segments(&mut |&a, &b| {
+            window.draw_line(&a.into_pnt3(), &b.into_pnt3(), &red)
         });
 
         let new_nodes = sc.iterate(config.move_distance, None);

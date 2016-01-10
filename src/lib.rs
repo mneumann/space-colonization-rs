@@ -68,16 +68,6 @@ struct Node<P, F> {
     /// The node's coordinate position.
     position: P,
 
-    // The active_lifetime of a node is reduced every
-    // time it is found being the closest node to some
-    // attraction point. If it hits 0, the node
-    // is no longer used.
-    active_lifetime: i32,
-    // The inactive_lifetime is reduce whenever a node
-    // is not being found as the closest towards an
-    // attraction point.
-    inactive_lifetime: i32,
-
     growth: F,
     growth_count: u32,
 }
@@ -89,6 +79,10 @@ impl<P, F> Node<P, F> {
         // self.root == self.parent
         self.length == 0
     }
+
+    fn is_active(&self) -> bool {
+        true
+    }
 }
 
 pub struct SpaceColonization<P, F>
@@ -97,8 +91,6 @@ pub struct SpaceColonization<P, F>
 {
     nodes: Vec<Node<P, F>>,
     attractors: Vec<Attractor<P, ()>>,
-    default_active_lifetime: i32,
-    default_inactive_lifetime: i32,
     default_attract_radius_sq: SqDist,
     default_connect_radius_sq: SqDist,
 }
@@ -107,16 +99,12 @@ impl<P, F> SpaceColonization<P, F>
     where P: FloatPnt<f32, F>,
           F: FloatVec<f32> + Zero + Copy
 {
-    pub fn new(default_active_lifetime: i32,
-               default_inactive_lifetime: i32,
-               default_attract_radius_sq: SqDist,
+    pub fn new(default_attract_radius_sq: SqDist,
                default_connect_radius_sq: SqDist)
                -> SpaceColonization<P, F> {
         SpaceColonization {
             nodes: Vec::new(),
             attractors: Vec::new(),
-            default_active_lifetime: default_active_lifetime,
-            default_inactive_lifetime: default_inactive_lifetime,
             default_attract_radius_sq: default_attract_radius_sq,
             default_connect_radius_sq: default_connect_radius_sq,
         }
@@ -163,8 +151,6 @@ impl<P, F> SpaceColonization<P, F>
             root: root,
             length: length,
             position: position,
-            active_lifetime: self.default_active_lifetime,
-            inactive_lifetime: self.default_inactive_lifetime,
             growth: Zero::zero(),
             growth_count: 0,
         });
@@ -199,7 +185,7 @@ impl<P, F> SpaceColonization<P, F>
                 let mut nearest_distance_sq = ap.attract_radius_sq;
                 let mut connect_node: Option<&mut Node<_, _>> = None;
                 for node in nodes.iter_mut() {
-                    if node.inactive_lifetime <= 0 || node.active_lifetime <= 0 {
+                    if !node.is_active() {
                         // The node has become inactive
                         continue;
                     }
@@ -256,14 +242,9 @@ impl<P, F> SpaceColonization<P, F>
                 let new_position = self.nodes[i].position + d;
                 self.add_node(new_position, Some(NodeIdx(i as u32, 0)));
 
-                self.nodes[i].active_lifetime -= 1;
-                self.nodes[i].inactive_lifetime = self.default_inactive_lifetime; // XXX
-
                 // and reset growth attraction forces
                 self.nodes[i].growth = Zero::zero();
                 self.nodes[i].growth_count = 0;
-            } else {
-                self.nodes[i].inactive_lifetime -= 1;
             }
         }
 

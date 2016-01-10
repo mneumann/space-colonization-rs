@@ -124,9 +124,9 @@ fn run<T, F>(config: &Config)
 {
     let mut rng = rand::thread_rng();
 
-    let mut sc: SpaceColonization<T, F> = SpaceColonization::new(10, 1,
-        SqDist::from_dist(config.influence_radius),
-        SqDist::from_dist(config.kill_distance));
+    let mut sc: SpaceColonization<T, F> =
+        SpaceColonization::new(SqDist::from_dist(config.influence_radius),
+                               SqDist::from_dist(config.kill_distance));
 
     for _ in 0..config.n_roots {
         sc.add_root_node(<T as MyPoint>::random(&mut rng));
@@ -145,12 +145,15 @@ fn run<T, F>(config: &Config)
                 let filename = format!("out_{:05}.eps", i);
                 let mut document = EpsDocument::new();
 
-                let points: Vec<_> = sc.attractors().iter().map(|attractor| {
-                     let pnt = attractor.position.into_pnt3();
-                     Position::new(pnt.x, pnt.y)
-                }).collect();
+                let points: Vec<_> = sc.attractors()
+                                       .iter()
+                                       .map(|attractor| {
+                                           let pnt = attractor.position.into_pnt3();
+                                           Position::new(pnt.x, pnt.y)
+                                       })
+                                       .collect();
 
-                document.add_shape(Box::new(Points(points, 0.005*SCALE/2.0)));
+                document.add_shape(Box::new(Points(points, 0.005 * SCALE / 2.0)));
 
                 let mut lines = Vec::new();
                 sc.iter_segments(&mut |&a, &b| {
@@ -161,7 +164,7 @@ fn run<T, F>(config: &Config)
                 document.add_shape(Box::new(SetRGB(1.0, 0.0, 0.0)));
                 document.add_shape(Box::new(Lines(lines)));
 
-                document.transform(Vec2::new(1.0, 1.0), Vec2::new(SCALE/2.0, SCALE/2.0));
+                document.transform(Vec2::new(1.0, 1.0), Vec2::new(SCALE / 2.0, SCALE / 2.0));
 
                 let mut file = File::create(filename).unwrap();
                 document.write_eps(&mut file, 100.0, 100.0).unwrap();

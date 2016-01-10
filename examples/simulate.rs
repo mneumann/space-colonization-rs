@@ -190,9 +190,9 @@ fn run<T, F>(config: &Config)
             window.draw_line(&a.into_pnt3(), &b.into_pnt3(), &red)
         });
 
-        let new_nodes = sc.iterate(None);
+        let new_nodes = sc.next();
 
-        println!("Iteration: {}. New nodes: {}", i, new_nodes);
+        println!("Iteration: {}. New nodes: {:?}", i, new_nodes);
 
         i += 1;
     }

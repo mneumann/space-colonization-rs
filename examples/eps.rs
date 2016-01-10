@@ -175,9 +175,9 @@ fn run<T, F>(config: &Config)
             }
         }
 
-        let new_nodes = sc.iterate(None);
+        let new_nodes = sc.next();
 
-        println!("Iteration: {}. New nodes: {}", i, new_nodes);
+        println!("Iteration: {}. New nodes: {:?}", i, new_nodes);
 
         i += 1;
     }

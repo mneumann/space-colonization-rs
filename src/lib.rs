@@ -112,6 +112,8 @@ pub struct SpaceColonization<P, F, I>
     default_attract_dist: SqDist,
     default_connect_dist: SqDist,
     move_dist: f32,
+    next_iteration: u32,
+    use_last_n_nodes: Option<usize>,
 }
 
 impl<P, F, I> SpaceColonization<P, F, I>
@@ -129,6 +131,8 @@ impl<P, F, I> SpaceColonization<P, F, I>
             default_attract_dist: default_attract_dist,
             default_connect_dist: default_connect_dist,
             move_dist: move_dist,
+            next_iteration: 0,
+            use_last_n_nodes: None, // XXX
         }
     }
 
@@ -203,11 +207,20 @@ impl<P, F, I> SpaceColonization<P, F, I>
             visitor(&attractor.position)
         }
     }
+}
 
-    pub fn iterate(&mut self, use_last_n_nodes: Option<usize>) -> usize {
+impl<P, F, I> Iterator for SpaceColonization<P, F, I>
+    where P: FloatPnt<f32, F>,
+          F: FloatVec<f32> + Zero + Copy,
+          I: Copy + Default
+{
+    type Item = usize;
+
+    fn next(&mut self) -> Option<Self::Item> {
         let num_nodes = self.nodes.len();
-        let use_last_nodes: usize = cmp::min(num_nodes, use_last_n_nodes.unwrap_or(num_nodes));
+        let use_last_nodes: usize = cmp::min(num_nodes, self.use_last_n_nodes.unwrap_or(num_nodes));
         let start_index = num_nodes - use_last_nodes;
+        self.next_iteration += 1;
 
         // for each attraction_point, find the nearest node that it influences
         let mut ap_idx = 0;
@@ -284,6 +297,6 @@ impl<P, F, I> SpaceColonization<P, F, I>
 
         // Note that nodes can oscillate, between two attraction points, so
         // it's better to stop after a certain number of iterations
-        return self.nodes.len() - num_nodes;
+        return Some(self.nodes.len() - num_nodes);
     }
 }

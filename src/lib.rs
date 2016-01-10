@@ -53,7 +53,16 @@ pub struct Attractor<P, I> {
 }
 
 struct Node<P, F> {
+    /// Index of the direct parent.
     parent: usize,
+
+    /// Number of nodes between this node and the root node.
+    length: usize,
+
+    /// Index of the root node this node is associated with.
+    root: usize,
+
+    /// The node's coordinate position.
     position: P,
 
     // The active_lifetime of a node is reduced every
@@ -124,18 +133,20 @@ impl<P, F> SpaceColonization<P, F>
     }
 
     fn add_node(&mut self, position: P, parent: Option<usize>) {
-        // NOTE: a root node has it's own index as parent
+        // NOTE: a root node has it's own index as parent and root.
         let len = self.nodes.len();
-        let parent = match parent {
+        let (parent, root, length) = match parent {
             Some(p) => {
                 assert!(p < len);
-                p
+                (p, self.nodes[p].root, self.nodes[p].length + 1)
             }
-            None => len,
+            None => (len, len, 0),
         };
 
         self.nodes.push(Node {
             parent: parent,
+            root: root,
+            length: length,
             position: position,
             active_lifetime: self.default_active_lifetime,
             inactive_lifetime: self.default_inactive_lifetime,

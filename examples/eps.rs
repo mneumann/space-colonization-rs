@@ -10,7 +10,7 @@ use rand::{Rng, Closed01};
 use num::Zero;
 use clap::{Arg, App};
 use std::str::FromStr;
-use space_colonization::SpaceColonization;
+use space_colonization::{SpaceColonization, SqDist};
 use eps_writer::{EpsDocument, Position, Points, Lines, SetRGB};
 use std::fs::File;
 
@@ -125,8 +125,8 @@ fn run<T, F>(config: &Config)
     let mut rng = rand::thread_rng();
 
     let mut sc: SpaceColonization<T, F> = SpaceColonization::new(10, 1,
-        config.influence_radius.powi(2),
-        config.kill_distance.powi(2));
+        SqDist::from_dist(config.influence_radius),
+        SqDist::from_dist(config.kill_distance));
 
     for _ in 0..config.n_roots {
         sc.add_root_node(<T as MyPoint>::random(&mut rng));

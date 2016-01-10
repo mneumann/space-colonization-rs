@@ -65,6 +65,11 @@ struct Node<P, F, I: Copy> {
     /// Number of nodes between this node and the root node.
     length: usize,
 
+    /// Number of branches this node has. This count
+    /// is increased whenever another node refers this node
+    /// as parent.
+    branches: usize,
+
     /// The node's coordinate position.
     position: P,
 
@@ -79,13 +84,21 @@ impl<P, F, I: Copy> Node<P, F, I> {
         self.assigned_information = Some(information);
     }
 
+    fn is_leaf(&self) -> bool {
+        self.branches == 0
+    }
+
     fn is_root(&self) -> bool {
-        // self.root == self.parent
+        // also self.root == self.parent
         self.length == 0
     }
 
     fn is_active(&self) -> bool {
         true
+    }
+
+    fn is_active2(&self, max_length: usize, max_branches: usize) -> bool {
+        self.length < max_length && self.branches < max_branches
     }
 }
 
@@ -128,30 +141,40 @@ impl<P, F, I> SpaceColonization<P, F, I>
     }
 
     pub fn add_root_node(&mut self, position: P) {
-        self.add_node(position, None);
+        // A root node has it's own index as parent and root.
+        let len = self.nodes.len();
+        self.nodes.push(Node {
+            parent: NodeIdx(len as u32, 0),
+            root: NodeIdx(len as u32, 0),
+            length: 0,
+            branches: 0,
+            position: position,
+            growth: Zero::zero(),
+            growth_count: 0,
+            assigned_information: None,
+        });
     }
 
     fn get_node(&self, node_idx: NodeIdx) -> Option<&Node<P, F, I>> {
         self.nodes.get(node_idx.0 as usize)
     }
 
-    fn add_node(&mut self, position: P, parent: Option<NodeIdx>) {
-        let (parent, root, length) = match parent {
-            Some(p) => {
-                let parent_node = self.get_node(p).unwrap();
-                (p, parent_node.root, parent_node.length + 1)
-            }
-            None => {
-                // A root node has it's own index as parent and root.
-                let len = self.nodes.len();
-                (NodeIdx(len as u32, 0), NodeIdx(len as u32, 0), 0)
-            }
+    fn get_node_mut(&mut self, node_idx: NodeIdx) -> Option<&mut Node<P, F, I>> {
+        self.nodes.get_mut(node_idx.0 as usize)
+    }
+
+    fn add_leaf_node(&mut self, position: P, parent: NodeIdx) {
+        let (root, length) = {
+            let parent_node = self.get_node_mut(parent).unwrap();
+            parent_node.branches += 1;
+            (parent_node.root, parent_node.length + 1)
         };
 
         self.nodes.push(Node {
             parent: parent,
             root: root,
             length: length,
+            branches: 0,
             position: position,
             growth: Zero::zero(),
             growth_count: 0,
@@ -250,7 +273,7 @@ impl<P, F, I> SpaceColonization<P, F, I>
                 let growth_factor = 1.0; //((growth_count + 1) as f32).ln();
                 let d = self.nodes[i].growth.normalize() * move_distance * growth_factor;
                 let new_position = self.nodes[i].position + d;
-                self.add_node(new_position, Some(NodeIdx(i as u32, 0)));
+                self.add_leaf_node(new_position, NodeIdx(i as u32, 0));
 
                 // and reset growth attraction forces
                 self.nodes[i].growth = Zero::zero();

@@ -111,6 +111,7 @@ pub struct SpaceColonization<P, F, I>
     attractors: Vec<Attractor<P, I>>,
     default_attract_dist: SqDist,
     default_connect_dist: SqDist,
+    move_dist: f32,
 }
 
 impl<P, F, I> SpaceColonization<P, F, I>
@@ -119,13 +120,15 @@ impl<P, F, I> SpaceColonization<P, F, I>
           I: Copy + Default
 {
     pub fn new(default_attract_dist: SqDist,
-               default_connect_dist: SqDist)
+               default_connect_dist: SqDist,
+               move_dist: f32)
                -> SpaceColonization<P, F, I> {
         SpaceColonization {
             nodes: Vec::new(),
             attractors: Vec::new(),
             default_attract_dist: default_attract_dist,
             default_connect_dist: default_connect_dist,
+            move_dist: move_dist,
         }
     }
 
@@ -201,7 +204,7 @@ impl<P, F, I> SpaceColonization<P, F, I>
         }
     }
 
-    pub fn iterate(&mut self, move_distance: f32, use_last_n_nodes: Option<usize>) -> usize {
+    pub fn iterate(&mut self, use_last_n_nodes: Option<usize>) -> usize {
         let num_nodes = self.nodes.len();
         let use_last_nodes: usize = cmp::min(num_nodes, use_last_n_nodes.unwrap_or(num_nodes));
         let start_index = num_nodes - use_last_nodes;
@@ -269,7 +272,7 @@ impl<P, F, I> SpaceColonization<P, F, I>
             let growth_count = self.nodes[i].growth_count;
             if growth_count > 0 {
                 let growth_factor = 1.0; //((growth_count + 1) as f32).ln();
-                let d = self.nodes[i].growth.normalize() * move_distance * growth_factor;
+                let d = self.nodes[i].growth.normalize() * self.move_dist * growth_factor;
                 let new_position = self.nodes[i].position + d;
                 self.add_leaf_node(new_position, NodeIdx(i as u32, 0));
 

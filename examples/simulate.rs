@@ -152,7 +152,8 @@ fn run<T, F>(config: &Config)
 
     let mut sc: SpaceColonization<T, F, ()> =
         SpaceColonization::new(SqDist::from_dist(config.influence_radius),
-                               SqDist::from_dist(config.kill_distance));
+                               SqDist::from_dist(config.kill_distance),
+                               config.move_distance);
 
     for _ in 0..config.n_roots {
         sc.add_root_node(<T as MyPoint>::random(&mut rng));
@@ -189,7 +190,7 @@ fn run<T, F>(config: &Config)
             window.draw_line(&a.into_pnt3(), &b.into_pnt3(), &red)
         });
 
-        let new_nodes = sc.iterate(config.move_distance, None);
+        let new_nodes = sc.iterate(None);
 
         println!("Iteration: {}. New nodes: {}", i, new_nodes);
 

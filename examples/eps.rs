@@ -84,7 +84,7 @@ impl Config {
                                    .required(false))
                           .arg(Arg::with_name("MD")
                                    .long("move-distance")
-                                   .help("Kill distance (default: 0.05)")
+                                   .help("Move distance (default: 0.05)")
                                    .takes_value(true)
                                    .required(false))
                           .arg(Arg::with_name("MAX_ITER")

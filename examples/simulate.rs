@@ -111,7 +111,7 @@ impl Config {
                                    .required(false))
                           .arg(Arg::with_name("MD")
                                    .long("move-distance")
-                                   .help("Kill distance (default: 0.05)")
+                                   .help("Move distance (default: 0.05)")
                                    .takes_value(true)
                                    .required(false))
                           .arg(Arg::with_name("MAX_ITER")
@@ -173,7 +173,7 @@ fn run<T, F>(config: &Config)
             // save previous iteration of window.render()
             if i > 0 && (i - 1) % n == 0 {
                 let img = window.snap_image();
-                let filename = format!("out_{}.png", i - 1);
+                let filename = format!("out_{:05}.png", i - 1);
                 let _ = img.save(&filename).unwrap();
             }
         }

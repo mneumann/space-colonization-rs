@@ -126,14 +126,17 @@ fn run<T, F>(config: &Config)
 
     let mut sc: SpaceColonization<T, F, ()> =
         SpaceColonization::new(SqDist::from_dist(config.influence_radius),
-                               SqDist::from_dist(config.kill_distance), config.move_distance);
+                               SqDist::from_dist(config.kill_distance),
+                               100, // max_length
+                               2, // max_branches
+                               config.move_distance);
 
     for _ in 0..config.n_roots {
         sc.add_root_node(<T as MyPoint>::random(&mut rng));
     }
 
     for _ in 0..config.n_attraction_points {
-        sc.add_attractor(<T as MyPoint>::random(&mut rng));
+        sc.add_default_attractor(<T as MyPoint>::random(&mut rng));
     }
 
     let mut i = 0;

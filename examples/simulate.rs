@@ -56,6 +56,8 @@ struct Config {
     use_3d: bool,
     max_iter: Option<usize>,
     save_every: Option<usize>,
+    max_length: u32,
+    max_branches: u32,
 }
 
 impl Config {
@@ -70,6 +72,8 @@ impl Config {
             use_3d: true,
             max_iter: None,
             save_every: None,
+            max_length: 100,
+            max_branches: 10,
         }
     }
 
@@ -84,6 +88,8 @@ impl Config {
             use_3d: false,
             max_iter: None,
             save_every: None,
+            max_length: 100,
+            max_branches: 10,
         }
     }
 
@@ -114,6 +120,16 @@ impl Config {
                                    .help("Move distance (default: 0.05)")
                                    .takes_value(true)
                                    .required(false))
+                          .arg(Arg::with_name("MAX_LENGTH")
+                                   .long("max-length")
+                                   .help("Maximal allowed length from root to leaf (default: 100)")
+                                   .takes_value(true)
+                                   .required(false))
+                          .arg(Arg::with_name("MAX_BRANCHES")
+                                   .long("max-branches")
+                                   .help("Maximal allowed number of branches per node (default: 10)")
+                                   .takes_value(true)
+                                   .required(false))
                           .arg(Arg::with_name("MAX_ITER")
                                    .long("max-iter")
                                    .help("Maximum iterations (default: infinite)")
@@ -138,6 +154,8 @@ impl Config {
             move_distance: f32::from_str(matches.value_of("MD").unwrap_or("0.05")).unwrap(),
             use_3d: matches.is_present("USE_3D"),
             max_iter: usize::from_str(matches.value_of("MAX_ITER").unwrap_or("INVALID")).ok(),
+            max_length: FromStr::from_str(matches.value_of("MAX_LENGTH").unwrap_or("100")).unwrap(),
+            max_branches: FromStr::from_str(matches.value_of("MAX_BRANCHES").unwrap_or("10")).unwrap(),
             save_every: usize::from_str(matches.value_of("SAVE_EVERY").unwrap_or("INVALID")).ok(),
         }
     }
@@ -153,6 +171,8 @@ fn run<T, F>(config: &Config)
     let mut sc: SpaceColonization<T, F, ()> =
         SpaceColonization::new(SqDist::from_dist(config.influence_radius),
                                SqDist::from_dist(config.kill_distance),
+                               config.max_length,
+                               config.max_branches,
                                config.move_distance);
 
     for _ in 0..config.n_roots {
@@ -160,7 +180,7 @@ fn run<T, F>(config: &Config)
     }
 
     for _ in 0..config.n_attraction_points {
-        sc.add_attractor(<T as MyPoint>::random(&mut rng));
+        sc.add_default_attractor(<T as MyPoint>::random(&mut rng));
     }
 
     let mut window = Window::new("Space Colonization");

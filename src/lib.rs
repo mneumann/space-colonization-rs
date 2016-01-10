@@ -27,47 +27,48 @@ pub enum ConnectAction {
 #[derive(Debug, Copy, Clone)]
 pub struct Attractor<P, I: Copy> {
     /// The square distance within which it can influence a Node.
-    attract_dist: SqDist,
+    pub attract_dist: SqDist,
 
     /// If there is a node closer than the square root of
     /// this distance, the information is exchanged with the
     /// node and the ```connect_action``` is performed.
     /// This can be for example: kill the attractor,
     /// or disable it for a while.
-    connect_dist: SqDist,
+    pub connect_dist: SqDist,
 
     /// The strenght with which it influences a Node.
     strength: f32,
 
     /// The position of the attractor.
-    position: P,
+    pub position: P,
 
     /// The attractor carries a bit of information.
     /// When a node comes closer than ```connect_radius```
     /// this bit of information is exchanged.
-    information: I,
+    pub information: I,
 
     /// Action performed when a node comes closer
     /// than ```connect_radius```.
-    connect_action: ConnectAction,
+    pub connect_action: ConnectAction,
 
     /// Starting from which iteration this attractor is active
     active_from_iteration: u32,
 }
 
 impl<P, I: Copy> Attractor<P, I> {
-    fn is_active(&self, current_iteration: u32) -> bool {
+    fn is_active_in(&self, current_iteration: u32) -> bool {
         current_iteration >= self.active_from_iteration
     }
+
     fn disable_until(&mut self, iteration: u32) {
         self.active_from_iteration = iteration;
     }
 }
 
-#[derive(Debug, Copy, Clone)]
-struct NodeIdx(u32, u32);
+#[derive(Debug, Copy, Clone, PartialEq, Eq)]
+struct NodeIdx(u32);
 
-struct Node<P, F, I: Copy> {
+pub struct Node<P, F, I: Copy> {
     /// Index of the direct parent.
     parent: NodeIdx,
 
@@ -75,20 +76,25 @@ struct Node<P, F, I: Copy> {
     root: NodeIdx,
 
     /// Number of nodes between this node and the root node.
-    length: usize,
+    pub length: u32,
 
     /// Number of branches this node has. This count
     /// is increased whenever another node refers this node
     /// as parent.
-    branches: usize,
+    pub branches: u32,
 
     /// The node's coordinate position.
-    position: P,
+    pub position: P,
 
+    /// Calculates the direction in which a new node is grown.
+    /// This value is reset every iteration.
     growth: F,
+
+    /// Number of attractors that this node is attracted by.
     growth_count: u32,
 
-    assigned_information: Option<I>,
+    /// For example an attractor could
+    pub assigned_information: Option<I>,
 }
 
 impl<P, F, I: Copy> Node<P, F, I> {
@@ -96,20 +102,20 @@ impl<P, F, I: Copy> Node<P, F, I> {
         self.assigned_information = Some(information);
     }
 
-    fn is_leaf(&self) -> bool {
+    pub fn is_leaf(&self) -> bool {
         self.branches == 0
     }
 
-    fn is_root(&self) -> bool {
-        // also self.root == self.parent
-        self.length == 0
+    pub fn is_root(&self) -> bool {
+        if self.length == 0 {
+            assert!(self.root == self.parent);
+            true
+        } else {
+            false
+        }
     }
 
-    fn is_active(&self) -> bool {
-        true
-    }
-
-    fn is_active2(&self, max_length: usize, max_branches: usize) -> bool {
+    fn is_active(&self, max_length: u32, max_branches: u32) -> bool {
         self.length < max_length && self.branches < max_branches
     }
 }
@@ -125,6 +131,8 @@ pub struct SpaceColonization<P, F, I>
     default_connect_dist: SqDist,
     move_dist: f32,
     next_iteration: u32,
+    max_length: u32,
+    max_branches: u32,
     use_last_n_nodes: Option<usize>,
 }
 
@@ -135,6 +143,8 @@ impl<P, F, I> SpaceColonization<P, F, I>
 {
     pub fn new(default_attract_dist: SqDist,
                default_connect_dist: SqDist,
+               max_length: u32,
+               max_branches: u32,
                move_dist: f32)
                -> SpaceColonization<P, F, I> {
         SpaceColonization {
@@ -142,13 +152,19 @@ impl<P, F, I> SpaceColonization<P, F, I>
             attractors: Vec::new(),
             default_attract_dist: default_attract_dist,
             default_connect_dist: default_connect_dist,
+            max_length: max_length,
+            max_branches: max_branches,
             move_dist: move_dist,
             next_iteration: 0,
             use_last_n_nodes: None, // XXX
         }
     }
 
-    pub fn add_attractor(&mut self, position: P) {
+    pub fn add_attractor(&mut self, attractor: Attractor<P, I>) {
+        self.attractors.push(attractor);
+    }
+
+    pub fn add_default_attractor(&mut self, position: P) {
         self.attractors.push(Attractor {
             attract_dist: self.default_attract_dist,
             connect_dist: self.default_connect_dist,
@@ -164,8 +180,8 @@ impl<P, F, I> SpaceColonization<P, F, I>
         // A root node has it's own index as parent and root.
         let len = self.nodes.len();
         self.nodes.push(Node {
-            parent: NodeIdx(len as u32, 0),
-            root: NodeIdx(len as u32, 0),
+            parent: NodeIdx(len as u32),
+            root: NodeIdx(len as u32),
             length: 0,
             branches: 0,
             position: position,
@@ -202,6 +218,14 @@ impl<P, F, I> SpaceColonization<P, F, I>
         });
     }
 
+    pub fn visit_attractor_points<V>(&self, visitor: &mut V)
+        where V: FnMut(&P)
+    {
+        for attractor in self.attractors.iter() {
+            visitor(&attractor.position)
+        }
+    }
+
     pub fn visit_node_segments<V>(&self, visitor: &mut V)
         where V: FnMut(&P, &P)
     {
@@ -213,11 +237,16 @@ impl<P, F, I> SpaceColonization<P, F, I>
         }
     }
 
-    pub fn visit_attractor_points<V>(&self, visitor: &mut V)
-        where V: FnMut(&P)
+    /// Calls the visitor for every node that has information associated.
+    /// The visitor is called with the node and it's associated root node.
+    /// The visitor is not called for root nodes itself!
+    pub fn visit_nodes_with_info_and_root<V>(&self, visitor: &mut V)
+        where V: FnMut(&Node<P, F, I>, &Node<P, F, I>)
     {
-        for attractor in self.attractors.iter() {
-            visitor(&attractor.position)
+        for node in self.nodes.iter() {
+            if node.assigned_information.is_some() && !node.is_root() {
+                visitor(node, &self.get_node(node.root).unwrap());
+            }
         }
     }
 }
@@ -230,6 +259,9 @@ impl<P, F, I> Iterator for SpaceColonization<P, F, I>
     type Item = usize;
 
     fn next(&mut self) -> Option<Self::Item> {
+        let max_length = self.max_length;
+        let max_branches = self.max_branches;
+
         let current_iteration = self.next_iteration;
         self.next_iteration += 1;
         let num_nodes = self.nodes.len();
@@ -239,13 +271,17 @@ impl<P, F, I> Iterator for SpaceColonization<P, F, I>
         // for each attraction_point, find the nearest node that it influences
         let mut ap_idx = 0;
         'outer: while ap_idx < self.attractors.len() {
-            let ap = self.attractors[ap_idx];
+            let ap = {
+                let ap_ref = &self.attractors[ap_idx];
 
-            if !ap.is_active(current_iteration) {
-                // is attractor is not active in the current iteration goto next.
-                ap_idx += 1;
-                continue;
-            }
+                if !ap_ref.is_active_in(current_iteration) {
+                    // is attractor is not active in the current iteration goto next.
+                    ap_idx += 1;
+                    continue;
+                }
+
+                *ap_ref
+            };
 
             let nodes = &mut self.nodes[start_index..];
 
@@ -254,7 +290,7 @@ impl<P, F, I> Iterator for SpaceColonization<P, F, I>
             let mut nearest_distance = ap.attract_dist;
             let mut connect_node: Option<&mut Node<_, _, _>> = None;
             for node in nodes.iter_mut() {
-                if !node.is_active() {
+                if !node.is_active(max_length, max_branches) {
                     // The node has become inactive
                     continue;
                 }
@@ -307,7 +343,7 @@ impl<P, F, I> Iterator for SpaceColonization<P, F, I>
                 let growth_factor = 1.0; //((growth_count + 1) as f32).ln();
                 let d = self.nodes[i].growth.normalize() * self.move_dist * growth_factor;
                 let new_position = self.nodes[i].position + d;
-                self.add_leaf_node(new_position, NodeIdx(i as u32, 0));
+                self.add_leaf_node(new_position, NodeIdx(i as u32));
 
                 // and reset growth attraction forces
                 self.nodes[i].growth = Zero::zero();

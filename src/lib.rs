@@ -25,7 +25,7 @@ pub enum ConnectAction {
 }
 
 #[derive(Debug, Copy, Clone)]
-pub struct Attractor<P, I> {
+pub struct Attractor<P, I: Copy> {
     /// The square distance within which it can influence a Node.
     attract_dist: SqDist,
 
@@ -55,7 +55,7 @@ pub struct Attractor<P, I> {
 #[derive(Debug, Copy, Clone)]
 struct NodeIdx(u32, u32);
 
-struct Node<P, F> {
+struct Node<P, F, I: Copy> {
     /// Index of the direct parent.
     parent: NodeIdx,
 
@@ -70,10 +70,14 @@ struct Node<P, F> {
 
     growth: F,
     growth_count: u32,
+
+    assigned_information: Option<I>,
 }
 
-impl<P, F> Node<P, F> {
-    fn send_information(&mut self, _information: ()) {}
+impl<P, F, I: Copy> Node<P, F, I> {
+    fn transmit_information(&mut self, information: I) {
+        self.assigned_information = Some(information);
+    }
 
     fn is_root(&self) -> bool {
         // self.root == self.parent
@@ -85,23 +89,25 @@ impl<P, F> Node<P, F> {
     }
 }
 
-pub struct SpaceColonization<P, F>
+pub struct SpaceColonization<P, F, I>
     where P: FloatPnt<f32, F>,
-          F: FloatVec<f32> + Zero + Copy
+          F: FloatVec<f32> + Zero + Copy,
+          I: Copy + Default
 {
-    nodes: Vec<Node<P, F>>,
-    attractors: Vec<Attractor<P, ()>>,
+    nodes: Vec<Node<P, F, I>>,
+    attractors: Vec<Attractor<P, I>>,
     default_attract_dist: SqDist,
     default_connect_dist: SqDist,
 }
 
-impl<P, F> SpaceColonization<P, F>
+impl<P, F, I> SpaceColonization<P, F, I>
     where P: FloatPnt<f32, F>,
-          F: FloatVec<f32> + Zero + Copy
+          F: FloatVec<f32> + Zero + Copy,
+          I: Copy + Default
 {
     pub fn new(default_attract_dist: SqDist,
                default_connect_dist: SqDist)
-               -> SpaceColonization<P, F> {
+               -> SpaceColonization<P, F, I> {
         SpaceColonization {
             nodes: Vec::new(),
             attractors: Vec::new(),
@@ -116,7 +122,7 @@ impl<P, F> SpaceColonization<P, F>
             connect_dist: self.default_connect_dist,
             strength: 1.0,
             position: position,
-            information: (),
+            information: I::default(),
             connect_action: ConnectAction::KillAttractor,
         });
     }
@@ -125,7 +131,7 @@ impl<P, F> SpaceColonization<P, F>
         self.add_node(position, None);
     }
 
-    fn get_node(&self, node_idx: NodeIdx) -> Option<&Node<P, F>> {
+    fn get_node(&self, node_idx: NodeIdx) -> Option<&Node<P, F, I>> {
         self.nodes.get(node_idx.0 as usize)
     }
 
@@ -149,6 +155,7 @@ impl<P, F> SpaceColonization<P, F>
             position: position,
             growth: Zero::zero(),
             growth_count: 0,
+            assigned_information: None,
         });
     }
 
@@ -185,9 +192,9 @@ impl<P, F> SpaceColonization<P, F>
                 let ap = self.attractors[ap_idx];
 
                 // find the node nearest to the `ap` attraction point
-                let mut nearest_node: Option<&mut Node<_, _>> = None;
+                let mut nearest_node: Option<&mut Node<_, _, _>> = None;
                 let mut nearest_distance = ap.attract_dist;
-                let mut connect_node: Option<&mut Node<_, _>> = None;
+                let mut connect_node: Option<&mut Node<_, _, _>> = None;
                 for node in nodes.iter_mut() {
                     if !node.is_active() {
                         // The node has become inactive
@@ -212,8 +219,7 @@ impl<P, F> SpaceColonization<P, F>
                 }
 
                 if let Some(node) = connect_node {
-                    // TODO: exchange information
-                    node.send_information(ap.information);
+                    node.transmit_information(ap.information);
                     match ap.connect_action {
                         ConnectAction::KillAttractor => {
                             // remove attraction point

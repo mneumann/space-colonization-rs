@@ -124,7 +124,7 @@ fn run<T, F>(config: &Config)
 {
     let mut rng = rand::thread_rng();
 
-    let mut sc: SpaceColonization<T, F> =
+    let mut sc: SpaceColonization<T, F, ()> =
         SpaceColonization::new(SqDist::from_dist(config.influence_radius),
                                SqDist::from_dist(config.kill_distance));
 

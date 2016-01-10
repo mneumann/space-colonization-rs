@@ -26,15 +26,15 @@ pub enum ConnectAction {
 
 #[derive(Debug, Copy, Clone)]
 pub struct Attractor<P, I> {
-    /// The radius^2 within which it can influence a Node.
-    attract_radius_sq: SqDist,
+    /// The square distance within which it can influence a Node.
+    attract_dist: SqDist,
 
     /// If there is a node closer than the square root of
-    /// this radius, the information is exchanged with the
+    /// this distance, the information is exchanged with the
     /// node and the ```connect_action``` is performed.
     /// This can be for example: kill the attractor,
     /// or disable it for a while.
-    connect_radius_sq: SqDist,
+    connect_dist: SqDist,
 
     /// The strenght with which it influences a Node.
     strength: f32,
@@ -91,22 +91,22 @@ pub struct SpaceColonization<P, F>
 {
     nodes: Vec<Node<P, F>>,
     attractors: Vec<Attractor<P, ()>>,
-    default_attract_radius_sq: SqDist,
-    default_connect_radius_sq: SqDist,
+    default_attract_dist: SqDist,
+    default_connect_dist: SqDist,
 }
 
 impl<P, F> SpaceColonization<P, F>
     where P: FloatPnt<f32, F>,
           F: FloatVec<f32> + Zero + Copy
 {
-    pub fn new(default_attract_radius_sq: SqDist,
-               default_connect_radius_sq: SqDist)
+    pub fn new(default_attract_dist: SqDist,
+               default_connect_dist: SqDist)
                -> SpaceColonization<P, F> {
         SpaceColonization {
             nodes: Vec::new(),
             attractors: Vec::new(),
-            default_attract_radius_sq: default_attract_radius_sq,
-            default_connect_radius_sq: default_connect_radius_sq,
+            default_attract_dist: default_attract_dist,
+            default_connect_dist: default_connect_dist,
         }
     }
 
@@ -116,8 +116,8 @@ impl<P, F> SpaceColonization<P, F>
 
     pub fn add_attractor(&mut self, position: P) {
         self.attractors.push(Attractor {
-            attract_radius_sq: self.default_attract_radius_sq,
-            connect_radius_sq: self.default_connect_radius_sq,
+            attract_dist: self.default_attract_dist,
+            connect_dist: self.default_connect_dist,
             strength: 1.0,
             position: position,
             information: (),
@@ -182,7 +182,7 @@ impl<P, F> SpaceColonization<P, F>
 
                 // find the node nearest to the `ap` attraction point
                 let mut nearest_node: Option<&mut Node<_, _>> = None;
-                let mut nearest_distance_sq = ap.attract_radius_sq;
+                let mut nearest_distance = ap.attract_dist;
                 let mut connect_node: Option<&mut Node<_, _>> = None;
                 for node in nodes.iter_mut() {
                     if !node.is_active() {
@@ -190,19 +190,19 @@ impl<P, F> SpaceColonization<P, F>
                         continue;
                     }
 
-                    let dist_sq = SqDist(node.position.sqdist(&ap.position));
+                    let dist = SqDist(node.position.sqdist(&ap.position));
 
-                    if dist_sq < ap.connect_radius_sq {
+                    if dist < ap.connect_dist {
                         // This node is within the connect radius of a node.
                         // XXX: There might be a closer node, but we use
                         // the first we find.
                         connect_node = Some(node);
                         // outside the node loop, we perform some action
                         break;
-                    } else if dist_sq < nearest_distance_sq {
+                    } else if dist < nearest_distance {
                         // ```node``` is within the influence of the attraction point,
                         // and it's closer than the currently closest node.
-                        nearest_distance_sq = dist_sq;
+                        nearest_distance = dist;
                         nearest_node = Some(node);
                     }
                 }

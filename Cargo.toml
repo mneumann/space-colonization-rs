@@ -16,3 +16,4 @@ nalgebra = "0.4.0"
 kiss3d = {git = "https://github.com/Ticki/kiss3d.git"}
 clap = "1.5.5"
 eps-writer = {git = "https://github.com/mneumann/eps-writer-rs"}
+dot = "0.1.2"

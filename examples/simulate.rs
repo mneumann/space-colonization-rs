@@ -11,7 +11,7 @@ use num::Zero;
 use space_colonization::{SpaceColonization, SqDist};
 use common::{MyPoint, Config};
 
-pub mod common; 
+pub mod common;
 
 fn run<T, F>(config: &Config)
     where T: MyPoint + FloatPnt<f32, F>,

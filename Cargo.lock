@@ -3,6 +3,7 @@ name = "space-colonization"
 version = "0.0.1"
 dependencies = [
  "clap 1.5.5 (registry+https://github.com/rust-lang/crates.io-index)",
+ "dot 0.1.2 (registry+https://github.com/rust-lang/crates.io-index)",
  "eps-writer 0.0.1 (git+https://github.com/mneumann/eps-writer-rs)",
  "kiss3d 0.1.4 (git+https://github.com/Ticki/kiss3d.git)",
  "nalgebra 0.4.0 (registry+https://github.com/rust-lang/crates.io-index)",
@@ -48,6 +49,11 @@ dependencies = [
 [[package]]
 name = "color_quant"
 version = "1.0.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+
+[[package]]
+name = "dot"
+version = "0.1.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 
 [[package]]

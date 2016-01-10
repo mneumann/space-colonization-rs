@@ -37,7 +37,7 @@ pub struct Attractor<P, I: Copy> {
     pub connect_dist: SqDist,
 
     /// The strenght with which it influences a Node.
-    strength: f32,
+    pub strength: f32,
 
     /// The position of the attractor.
     pub position: P,
@@ -52,7 +52,7 @@ pub struct Attractor<P, I: Copy> {
     pub connect_action: ConnectAction,
 
     /// Starting from which iteration this attractor is active
-    active_from_iteration: u32,
+    pub active_from_iteration: u32,
 }
 
 impl<P, I: Copy> Attractor<P, I> {
@@ -177,6 +177,10 @@ impl<P, F, I> SpaceColonization<P, F, I>
     }
 
     pub fn add_root_node(&mut self, position: P) {
+        self.add_root_node_with_information(position, None)
+    }
+
+    pub fn add_root_node_with_information(&mut self, position: P, information: Option<I>) {
         // A root node has it's own index as parent and root.
         let len = self.nodes.len();
         self.nodes.push(Node {
@@ -187,7 +191,7 @@ impl<P, F, I> SpaceColonization<P, F, I>
             position: position,
             growth: Zero::zero(),
             growth_count: 0,
-            assigned_information: None,
+            assigned_information: information,
         });
     }
 
@@ -226,6 +230,15 @@ impl<P, F, I> SpaceColonization<P, F, I>
         }
     }
 
+    pub fn visit_attractors<V>(&self, visitor: &mut V)
+        where V: FnMut(&Attractor<P, I>)
+    {
+        for attractor in self.attractors.iter() {
+            visitor(attractor)
+        }
+    }
+
+
     pub fn visit_node_segments<V>(&self, visitor: &mut V)
         where V: FnMut(&P, &P)
     {
@@ -246,6 +259,16 @@ impl<P, F, I> SpaceColonization<P, F, I>
         for node in self.nodes.iter() {
             if node.assigned_information.is_some() && !node.is_root() {
                 visitor(node, &self.get_node(node.root).unwrap());
+            }
+        }
+    }
+
+    pub fn visit_root_nodes<V>(&self, visitor: &mut V)
+        where V: FnMut(&Node<P, F, I>)
+    {
+        for node in self.nodes.iter() {
+            if node.is_root() {
+                visitor(node);
             }
         }
     }

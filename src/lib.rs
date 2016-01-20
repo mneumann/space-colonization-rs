@@ -4,9 +4,10 @@ extern crate num;
 use na::{Norm, FloatPnt, FloatVec};
 use num::Zero;
 use std::cmp;
+use std::fmt::Debug;
 
 /// Wraps a square distance.
-#[derive(Copy, Clone, Debug, PartialEq, PartialOrd)]
+#[derive(Debug, Copy, Clone, PartialEq, PartialOrd)]
 pub struct SqDist(pub f32);
 
 impl SqDist {
@@ -22,6 +23,7 @@ pub enum ConnectAction {
     DisableFor {
         iterations: u32,
     },
+    DisableForConnectingRoot,
 }
 
 #[derive(Debug, Copy, Clone)]
@@ -53,6 +55,15 @@ pub struct Attractor<P, I: Copy> {
 
     /// Starting from which iteration this attractor is active
     pub active_from_iteration: u32,
+
+    /// When set, this denies nodes of trees rooted at the specified
+    /// NodeIdx to be attracted by this attractor. This allows to 
+    /// simultaneous grow connects from Nodes to other Nodes without
+    /// suffering from self-attraction. 
+    pub not_for_root: Option<NodeIdx>,
+
+    /// Same as not_for_root, but this is used by ConnectAction::DisableForConnectingRoot
+    pub not_for_connecting_root: Option<NodeIdx>,
 }
 
 impl<P, I: Copy> Attractor<P, I> {
@@ -66,14 +77,19 @@ impl<P, I: Copy> Attractor<P, I> {
 }
 
 #[derive(Debug, Copy, Clone, PartialEq, Eq)]
-struct NodeIdx(u32);
+pub struct NodeIdx(pub u32);
 
-pub struct Node<P, F, I: Copy> {
+#[derive(Debug)]
+pub struct Node<P, F, I>
+    where P: Debug,
+          F: Debug,
+          I: Copy + Debug
+{
     /// Index of the direct parent.
     parent: NodeIdx,
 
     /// Index of the root node this node is associated with.
-    root: NodeIdx,
+    pub root: NodeIdx,
 
     /// Number of nodes between this node and the root node.
     pub length: u32,
@@ -97,7 +113,11 @@ pub struct Node<P, F, I: Copy> {
     pub assigned_information: Option<I>,
 }
 
-impl<P, F, I: Copy> Node<P, F, I> {
+impl<P, F, I> Node<P, F, I>
+    where P: Debug,
+          F: Debug,
+          I: Copy + Debug
+{
     fn transmit_information(&mut self, information: I) {
         self.assigned_information = Some(information);
     }
@@ -121,9 +141,9 @@ impl<P, F, I: Copy> Node<P, F, I> {
 }
 
 pub struct SpaceColonization<P, F, I>
-    where P: FloatPnt<f32, F>,
-          F: FloatVec<f32> + Zero + Copy,
-          I: Copy + Default
+    where P: FloatPnt<f32, F> + Debug,
+          F: FloatVec<f32> + Zero + Copy + Debug,
+          I: Copy + Default + Debug
 {
     nodes: Vec<Node<P, F, I>>,
     attractors: Vec<Attractor<P, I>>,
@@ -137,9 +157,9 @@ pub struct SpaceColonization<P, F, I>
 }
 
 impl<P, F, I> SpaceColonization<P, F, I>
-    where P: FloatPnt<f32, F>,
-          F: FloatVec<f32> + Zero + Copy,
-          I: Copy + Default
+    where P: FloatPnt<f32, F> + Debug,
+          F: FloatVec<f32> + Zero + Copy + Debug,
+          I: Copy + Default + Debug
 {
     pub fn new(default_attract_dist: SqDist,
                default_connect_dist: SqDist,
@@ -173,19 +193,26 @@ impl<P, F, I> SpaceColonization<P, F, I>
             information: I::default(),
             connect_action: ConnectAction::KillAttractor,
             active_from_iteration: 0,
+            not_for_root: None,
+            not_for_connecting_root: None,
         });
     }
 
-    pub fn add_root_node(&mut self, position: P) {
+    pub fn add_root_node(&mut self, position: P) -> NodeIdx {
         self.add_root_node_with_information(position, None)
     }
 
-    pub fn add_root_node_with_information(&mut self, position: P, information: Option<I>) {
+    /// Returns the root node's index.
+    pub fn add_root_node_with_information(&mut self,
+                                          position: P,
+                                          information: Option<I>)
+                                          -> NodeIdx {
         // A root node has it's own index as parent and root.
         let len = self.nodes.len();
+        let root_idx = NodeIdx(len as u32);
         self.nodes.push(Node {
-            parent: NodeIdx(len as u32),
-            root: NodeIdx(len as u32),
+            parent: root_idx,
+            root: root_idx,
             length: 0,
             branches: 0,
             position: position,
@@ -193,6 +220,7 @@ impl<P, F, I> SpaceColonization<P, F, I>
             growth_count: 0,
             assigned_information: information,
         });
+        root_idx
     }
 
     fn get_node(&self, node_idx: NodeIdx) -> Option<&Node<P, F, I>> {
@@ -275,9 +303,9 @@ impl<P, F, I> SpaceColonization<P, F, I>
 }
 
 impl<P, F, I> Iterator for SpaceColonization<P, F, I>
-    where P: FloatPnt<f32, F>,
-          F: FloatVec<f32> + Zero + Copy,
-          I: Copy + Default
+    where P: FloatPnt<f32, F> + Debug,
+          F: FloatVec<f32> + Zero + Copy + Debug,
+          I: Copy + Default + Debug
 {
     type Item = usize;
 
@@ -318,6 +346,22 @@ impl<P, F, I> Iterator for SpaceColonization<P, F, I>
                     continue;
                 }
 
+                match ap.not_for_root {
+                    Some(deny_root) if deny_root == node.root => {
+                        // The attractor is not for this tree node.
+                        continue;
+                    }
+                    _ => {}
+                }
+
+                match ap.not_for_connecting_root {
+                    Some(deny_root) if deny_root == node.root => {
+                        // The attractor is not for this tree node.
+                        continue;
+                    }
+                    _ => {}
+                }
+
                 let dist = SqDist(node.position.sqdist(&ap.position));
 
                 if dist < ap.connect_dist {
@@ -346,6 +390,9 @@ impl<P, F, I> Iterator for SpaceColonization<P, F, I>
                     }
                     ConnectAction::DisableFor {iterations} => {
                         self.attractors[ap_idx].disable_until(current_iteration + iterations);
+                    }
+                    ConnectAction::DisableForConnectingRoot => {
+                        self.attractors[ap_idx].not_for_connecting_root = Some(node.root)
                     }
                 }
             } else if let Some(node) = nearest_node {

@@ -11,14 +11,15 @@ use space_colonization::{SpaceColonization, SqDist};
 use eps_writer::{EpsDocument, Position, Points, Lines, SetRGB};
 use std::fs::File;
 use common::{MyPoint, Config};
+use std::fmt::Debug;
 
 pub mod common;
 
 const SCALE: f32 = 400.0;
 
 fn run<T, F>(config: &Config)
-    where T: MyPoint + FloatPnt<f32, F>,
-          F: FloatVec<f32> + Zero + Copy
+    where T: MyPoint + FloatPnt<f32, F> + Debug,
+          F: FloatVec<f32> + Zero + Copy + Debug
 {
     let mut rng = rand::thread_rng();
 

@@ -13,6 +13,7 @@ use na::{Pnt2, Pnt3, Vec2, Vec3, FloatPnt, FloatVec};
 use num::Zero;
 use space_colonization::{SpaceColonization, SqDist, Attractor, ConnectAction};
 use common::{MyPoint, Config};
+use std::fmt::Debug;
 
 pub mod common;
 
@@ -30,8 +31,8 @@ impl Default for Information {
 }
 
 fn run<T, F>(config: &Config)
-    where T: MyPoint + FloatPnt<f32, F>,
-          F: FloatVec<f32> + Zero + Copy
+    where T: MyPoint + FloatPnt<f32, F> + Debug,
+          F: FloatVec<f32> + Zero + Copy + Debug
 {
     let mut rng = rand::thread_rng();
 
@@ -42,14 +43,22 @@ fn run<T, F>(config: &Config)
         config.max_branches,
         config.move_distance);
 
-    // these are the source nodes
+    // these are the source nodes. This is where we start growing.
+    /*
     for src in 0..config.n_roots {
-        sc.add_root_node_with_information(<T as MyPoint>::random(&mut rng), Some(Information::Source(src)));
+        //sc.add_root_node_with_information(<T as MyPoint>::random(&mut rng), Some(Information::Source(src)));
+        sc.add_root_node(<T as MyPoint>::random(&mut rng));
     }
+    */
 
     // add target nodes and their attractor points
     for dst in 0..config.target_nodes.unwrap() {
         let target_pt = <T as MyPoint>::random(&mut rng);
+
+        // For each target node, add a root node.
+        // XXX: Treat target and root nodes equally.
+        let root_idx = sc.add_root_node(target_pt); 
+
         // place n attractor points around the target_pt
         for _ in 0 .. config.attractors_per_target_node {
             sc.add_attractor(Attractor {
@@ -59,14 +68,17 @@ fn run<T, F>(config: &Config)
                 position: <T as MyPoint>::random_around(&mut rng, target_pt, config.target_attractor_radius),
                 information: Information::Target(dst),
                 //connect_action: ConnectAction::KillAttractor,
-                connect_action: ConnectAction::DisableFor{iterations:100_000},
+                connect_action: ConnectAction::DisableForConnectingRoot, //{iterations:100_000},
                 active_from_iteration: 0,
+                not_for_root: Some(root_idx),
+                not_for_connecting_root: None,
             });
         }
         // target nodes do not exist. but their attractor points. later we want to generate only
         // nodes, which can be both source and target. we have to take care that a source node
         // is not attracted by itself. that could be accomplished by disabling the attraction
         // points for some time and activating only the nodes created during the last e.g. 5 iterations.
+
     }
 
     // these are ordinary attraction points
@@ -112,24 +124,52 @@ fn run<T, F>(config: &Config)
             window.draw_point(&a.position.into_pnt3(), color)
         });
 
+        /*
         sc.visit_root_nodes(&mut |a| {
             let color = &src_col;
             window.draw_point(&a.position.into_pnt3(), color)
         });
+        */
 
         let new_nodes = sc.next();
 
-        println!("Iteration: {}. New nodes: {:?}", i, new_nodes);
+        //println!("Iteration: {}. New nodes: {:?}", i, new_nodes);
 
         i += 1;
     }
+
+    // Now build the graph. For that we inspect all node that carry information.
+    let mut edges = Vec::new();
+    println!("digraph space {{");
+    sc.visit_nodes_with_info_and_root(&mut|info_node, root_node| {
+        match info_node.assigned_information {
+            Some(Information::Target(tgt)) => {
+                let src = root_node.root.0;
+                /*
+                println!("tgt: {:?}", tgt);
+                println!("info: {:?}", info_node);
+                println!("root: {:?}", root_node);
+                println!("{} -> {} ({})", src, tgt, info_node.length);
+                println!("----------------------------");
+                */
+                edges.push((src, tgt, info_node.length));
+
+                println!("{} -> {} [weight={}];", src, tgt, info_node.length);
+            }
+            _ => {}
+        }
+    });
+    //println!("{:?}", edges);
+
+
+    println!("}}");
 }
 
 
 fn main() {
     let config = Config::from_cmd();
 
-    println!("{:?}", config);
+    //println!("{:?}", config);
 
     if config.use_3d {
         run::<Pnt3<f32>, Vec3<f32>>(&config);

@@ -10,12 +10,13 @@ use na::{Pnt2, Pnt3, Vec2, Vec3, FloatPnt, FloatVec};
 use num::Zero;
 use space_colonization::{SpaceColonization, SqDist};
 use common::{MyPoint, Config};
+use std::fmt::Debug;
 
 pub mod common;
 
 fn run<T, F>(config: &Config)
-    where T: MyPoint + FloatPnt<f32, F>,
-          F: FloatVec<f32> + Zero + Copy
+    where T: MyPoint + FloatPnt<f32, F> + Debug,
+          F: FloatVec<f32> + Zero + Copy + Debug
 {
     let mut rng = rand::thread_rng();
 

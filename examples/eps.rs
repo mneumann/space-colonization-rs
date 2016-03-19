@@ -26,8 +26,8 @@ fn run<T, F>(config: &Config)
     let mut sc: SpaceColonization<T, F, ()> =
         SpaceColonization::new(SqDist::from_dist(config.influence_radius),
                                SqDist::from_dist(config.kill_distance),
-                               100, // max_length
-                               2, // max_branches
+                               config.max_length,
+                               config.max_branches,
                                config.move_distance);
 
     for _ in 0..config.n_roots {
